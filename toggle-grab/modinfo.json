@@ -1,0 +1,19 @@
+{
+	"manifestVersion": 1,
+	"id": "shander.toggle-grab",
+	"name": "Toggle Grab",
+	"version": "1.1.0",
+	"apiVersion": 1,
+	"author": "shander",
+	"description": "Makes the Grabber tool toggle on/off with a click instead of requiring you to hold the mouse button. Click once to start grabbing, click again to drop. Includes an on/off setting in the mod's config panel so you can switch back to the default hold-to-grab behavior at any time. No other tool is affected.",
+	"entry": "main.js",
+	"patches": "patches.json",
+	"configSchema": {
+		"enabled": {
+			"type": "boolean",
+			"default": true,
+			"label": "Toggle Mode",
+			"description": "When on, click once to grab and click again to drop. When off, the Grabber works normally (hold the mouse button)."
+		}
+	}
+}

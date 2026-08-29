@@ -1,0 +1,9 @@
+[
+	{
+		"file": "js/bundle.js",
+		"find": "n.action.state={[r.qy.Start]:n.input.mouse.clicked,[r.qy.Active]:n.input.mouse.pressed,[r.qy.End]:n.input.mouse.released}",
+		"operation": "replace",
+		"code": "n.action.state={[r.qy.Start]:n.input.mouse.clicked,[r.qy.Active]:(()=>{const g=l&&l.type===r.X2.Tool&&l.id===r.Np.Grabber;const cfg=e.session.settings&&e.session.settings.externalModSettings&&e.session.settings.externalModSettings[\"shander.toggle-grab\"];const enabled=!cfg||cfg.enabled!==false;if(!enabled){globalThis.__toggleGrabWasEquipped=false;globalThis.__toggleGrabActive=false;return n.input.mouse.pressed;}if(g){if(!globalThis.__toggleGrabWasEquipped)globalThis.__toggleGrabActive=false;if(n.input.mouse.clicked)globalThis.__toggleGrabActive=!globalThis.__toggleGrabActive;}globalThis.__toggleGrabWasEquipped=g;return g?!!globalThis.__toggleGrabActive:n.input.mouse.pressed;})(),[r.qy.End]:n.input.mouse.released}",
+		"expectedMatches": 1
+	}
+]
