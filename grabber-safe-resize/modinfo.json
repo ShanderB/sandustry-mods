@@ -1,0 +1,11 @@
+{
+	"manifestVersion": 1,
+	"id": "shander.grabber-safe-resize",
+	"name": "Resize Grabber While Holding",
+	"version": "1.0.0",
+	"apiVersion": 1,
+	"author": "shander",
+	"description": "Lets you resize the Grabber (Ctrl+Scroll or the size buttons) even while it's holding material. Shrinking only happens if everything currently held still fits in the smaller size - the held material is repacked with no gaps or spillage. If it wouldn't fit, the resize is simply refused and nothing changes. Growing while holding always worked safely and is unblocked the same way.",
+	"entry": "main.js",
+	"patches": "patches.json"
+}
