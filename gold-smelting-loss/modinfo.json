@@ -1,0 +1,10 @@
+{
+	"manifestVersion": 1,
+	"id": "shander.gold-smelting-loss",
+	"name": "Molten Gold Density",
+	"version": "1.0.0",
+	"apiVersion": 1,
+	"author": "shander",
+	"description": "Gold melting in the Smelter always turns into liquid gold - never randomly does nothing - but liquid gold now packs 2 solid pixels into every 1 liquid pixel, deterministically. Each liquid pixel is worth double, so total sell value never changes: only the physical footprint shrinks. 1000 pixels of solid gold in, 500 pixels of liquid gold out, still worth 1000.",
+	"entry": "main.js"
+}
