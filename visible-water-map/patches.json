@@ -1,0 +1,10 @@
+[
+	{
+		"id": "show-elements-on-map",
+		"file": "js/bundle.js",
+		"find": "}}catch(e){}return 0}function Hc(e){",
+		"operation": "replace",
+		"code": "}}catch(e){}try{if(0!==r&&ie.on.isCellIdElement(r)){const t=ie.on.getElementTypeFromCellId(e.shared.sim,r);if(null!=t&&bc){const n=bc.get(t);if(null!=n)return n}}}catch(e){}return 0}function Hc(e){",
+		"expectedMatches": 1
+	}
+]
