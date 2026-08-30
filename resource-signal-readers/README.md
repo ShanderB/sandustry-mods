@@ -217,21 +217,35 @@ fio nem derrubar o bloco.
 
 ## Ponto de honestidade
 
-Isso é território não documentado nem usado por nenhum mod da comunidade
-que encontrei — é a parte mais arriscada do que já fiz até agora. Validei
-o patch com o validador/aplicador real do jogo (aplica limpo, sintaxe
-válida), e a lógica bate exatamente com o código de consumo que
-encontrei, mas só o teste dentro do jogo confirma 100%. Se os blocos
-aparecerem na aba Logic mas o sinal não propagar pros fios, provavelmente
-é algum passo extra de "registro" que não encontrei (por exemplo, algo
-que marca a estrutura como elegível pro modo de ligar fio clicando nela)
-— me avisa o que você observar que eu ajusto.
+Isso mexe em território não documentado nem usado por nenhum mod da
+comunidade que encontrei (`registerSenderType`, e escrever direto em
+`session.mods.signals` pra manter o sinal ao vivo) — foi a parte mais
+arriscada de todo o processo, com várias tentativas erradas pelo caminho
+(documentadas acima). **Confirmado funcionando de ponta a ponta** pelo
+usuário: bloco aparece, desbloqueado desde o início, sinal liga/desliga
+corretamente conforme o limiar, painel de configuração por clique
+funciona. Os logs de diagnóstico que ajudaram a chegar até aqui foram
+removidos do código depois de tudo confirmado — se precisar depurar de
+novo no futuro, esse histórico acima mostra exatamente as armadilhas já
+mapeadas (`sandkit.api` como retrato tirado cedo demais, `setAll` nunca
+aparecendo nele, etc).
 
-**Se ainda não aparecer:** o log em
-`%APPDATA%\sandustry\logs\main.log` só mostra o processo principal do
-Electron (confirma que os patches aplicaram), não os erros do main.js do
-mod em si — esses vão pro console de DevTools do jogo. Se o jogo abrir
-DevTools com F12 (vi outro mod da comunidade mencionar isso), abre o
-console lá logo depois de carregar um save e procura por linhas
-`[shander.resource-signal-readers]` — qualquer erro ali me diz
-exatamente onde travou.
+## Publicar no Steam Workshop
+
+O mod está pronto pra publicar:
+
+- `preview.png` (512x512) incluso — os três ícones dos blocos (lingote,
+  raio, diamante) com fios convergindo pra uma lâmpada de sinal acesa,
+  comunicando o conceito "leem recurso, emitem sinal".
+- `modinfo.json` já tem `name`, `description` e `version` preenchidos,
+  refletindo o comportamento atual (configuração por clique no bloco, não
+  mais só pelas configurações do mod).
+
+Pra publicar: com o Steam aberto, abra o Sandustry, vá na aba de Mods,
+ache "Resource Signal Readers" na lista de mods locais e use a opção de
+publicar/upload. A primeira publicação sai como **Unlisted** — depois é
+só ir na página do item no Workshop e marcar como Public quando quiser
+divulgar. O jogo grava um `workshop.json` na pasta na primeira
+publicação; não edite nem apague esse arquivo — é o que liga esta pasta
+local ao item publicado pras próximas atualizações (suba a `version` no
+`modinfo.json` e publique de novo pra atualizar o mesmo item).
