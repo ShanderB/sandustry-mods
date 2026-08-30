@@ -5,7 +5,7 @@
 	"version": "1.0.0",
 	"apiVersion": 1,
 	"author": "shander",
-	"description": "Water was completely absent from the map/minimap - the game's map renderer only ever looks at terrain, walls and structures at each cell, never at loose elements. This patches it to also check for elements (water included) and draw them in their real color, so pools and lakes finally show up.",
+	"description": "Water (and every other loose element - steam, lava...) was completely absent from the map/minimap - the game's map renderer only ever looks at terrain, walls and structures at each cell, never at elements. This patches it to also check for elements and draw them in their real color, plus gives water its own distinct teal so it doesn't blend into the sky-blue map background. Lakes, vents, lava flows and more now finally show up.",
 	"entry": "main.js",
 	"patches": "patches.json"
 }

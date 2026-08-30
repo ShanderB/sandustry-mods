@@ -1,9 +1,11 @@
 # Visible Water on Map (Sandustry)
 
-Faz a água aparecer no mapa/minimapa. O mapa nativo simplesmente nunca
-desenha elementos soltos (água, areia, lava...) em nenhuma cor — esse
-mod corrige isso e ainda dá pra água um teal bem distinto do azul do
-céu, pra ela não se confundir com o fundo depois de aparecer.
+Faz elementos soltos aparecerem no mapa/minimapa — água, vapor, lava,
+areia, gás, qualquer coisa com cor própria. O mapa nativo simplesmente
+nunca desenhava nenhum elemento em nenhuma cor, só terreno/parede/
+estrutura; esse mod corrige isso pra todos eles, e ainda dá pra água
+especificamente um teal bem distinto do azul do céu, pra ela não se
+confundir com o fundo do mapa depois de aparecer.
 
 ## Instalar
 
@@ -84,3 +86,14 @@ não é estrutura/terreno/parede, checa se é um elemento
 retornar transparente. Assim qualquer elemento com `metaColor` passa a
 aparecer no mapa — e a mudança de cor da água (item acima) finalmente
 tem efeito visível, porque agora a célula realmente é desenhada.
+
+## Efeito colateral bom: não é só água
+
+Como a checagem em `zc` foi adicionada pra "elemento" em geral, não só
+água, todo elemento solto com `metaColor` passa a aparecer no mapa:
+vapor, lava, areia, gás, óleo etc. Testado pelo usuário e confirmado
+como comportamento desejado — não só não atrapalha, como deixa o mapa
+bem mais informativo (dá pra ver flows de lava e bolsões de gás à
+distância, por exemplo). Por isso o nome do mod ficou "Visible Water on
+Map" mas o efeito real é mais amplo; a descrição no Workshop já deixa
+isso explícito.
