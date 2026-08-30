@@ -1,0 +1,31 @@
+{
+	"manifestVersion": 1,
+	"id": "shander.resource-signal-readers",
+	"name": "Resource Signal Readers",
+	"version": "1.0.0",
+	"apiVersion": 1,
+	"author": "shander",
+	"description": "Three Logic-tab blocks - Gold Reader, Energy Reader, Fluxite Reader - that emit a true signal to connected logic wires whenever the matching stored resource is at or above a threshold. Click a placed block to open a small panel and set its own threshold; each block remembers its own value. Use one block per resource; place several to watch more than one at a time.",
+	"entry": "main.js",
+	"patches": "patches.json",
+	"configSchema": {
+		"goldThreshold": {
+			"type": "number",
+			"default": 1,
+			"label": "Gold Reader Default Threshold",
+			"description": "Starting threshold for newly placed Gold Reader blocks (click a placed block to override it individually)."
+		},
+		"energyThreshold": {
+			"type": "number",
+			"default": 1,
+			"label": "Energy Reader Default Threshold",
+			"description": "Starting threshold for newly placed Energy Reader blocks (click a placed block to override it individually)."
+		},
+		"fluxiteThreshold": {
+			"type": "number",
+			"default": 1,
+			"label": "Fluxite Reader Default Threshold",
+			"description": "Starting threshold for newly placed Fluxite Reader blocks (click a placed block to override it individually)."
+		}
+	}
+}

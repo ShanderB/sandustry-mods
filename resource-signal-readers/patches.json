@@ -1,0 +1,10 @@
+[
+	{
+		"id": "expose-registerSenderType",
+		"file": "js/bundle.js",
+		"find": "signals:{targets:{register:(e,t,n)=>{",
+		"operation": "replace",
+		"code": "signals:{registerSenderType:(e,t,n)=>{const a=(()=>{var r,o;const a=null===(o=null===(r=e.session)||void 0===r?void 0:r.mods)||void 0===o?void 0:o.signals;if(!a)throw new Error(\"Signals must be initialized before registering senders.\");return a})(),i=\"string\"==typeof t?$t.structures.resolveTypeName(t):t;a.senderTypes.add(i),n&&a.senderOutputGetters.set(i,n)},targets:{register:(e,t,n)=>{",
+		"expectedMatches": 1
+	}
+]
