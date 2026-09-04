@@ -6,5 +6,21 @@
 		"operation": "replace",
 		"code": "}}catch(e){}try{if(0!==r&&ie.on.isCellIdElement(r)){const t=ie.on.getElementTypeFromCellId(e.shared.sim,r);if(null!=t&&bc){const n=bc.get(t);if(null!=n)return n}}}catch(e){}return 0}function Hc(e){",
 		"expectedMatches": 1
+	},
+	{
+		"id": "refresh-map-elements-on-player-move",
+		"file": "js/bundle.js",
+		"find": "if(Jc(e,t,n,r)){xc=!0;try{sd(e,t,n,r)}catch(e){}ad(),ld(),a=!0}",
+		"operation": "replace",
+		"code": "{const _fogChanged=Jc(e,t,n,r);if(_fogChanged)xc=!0;let _idChanged=!1;try{_idChanged=sd(e,t,n,r)}catch(e){}if(_fogChanged||_idChanged){ad(),ld(),a=!0}}",
+		"expectedMatches": 1
+	},
+	{
+		"id": "refresh-map-elements-every-frame",
+		"file": "js/bundle.js",
+		"find": "}(Al),Wc(Al),gd()};e()}()",
+		"operation": "replace",
+		"code": "}(Al),function(e){if(!ul)return;try{const{x:t,y:n}=Kc(e),r=Math.max(1,Math.ceil(24));sd(e,t,n,r)}catch(e){}}(Al),Wc(Al),gd()};e()}()",
+		"expectedMatches": 1
 	}
 ]

@@ -5,7 +5,7 @@
 	"version": "1.0.0",
 	"apiVersion": 1,
 	"author": "shander",
-	"description": "Water (and every other loose element - steam, lava...) was completely absent from the map/minimap - the game's map renderer only ever looks at terrain, walls and structures at each cell, never at elements. This patches it to also check for elements and draw them in their real color, plus gives water its own distinct teal so it doesn't blend into the sky-blue map background. Lakes, vents, lava flows and more now finally show up.",
+	"description": "Water (and every other loose element - steam, lava, oil, sand, gas...) was completely absent from the map/minimap - the game's map renderer only ever looks at terrain, walls and structures, never at elements. This patches it to also check for elements and draw them in their real color, gives water its own distinct teal, and fixes the map only ever refreshing once per session so changes near you now update live as you walk around instead of only showing up after a restart.",
 	"entry": "main.js",
 	"patches": "patches.json"
 }
