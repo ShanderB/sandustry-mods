@@ -2,9 +2,9 @@
 	{
 		"id": "fix-setGrabberSize-safe-shrink",
 		"file": "js/bundle.js",
-		"find": "const d=l.data.matrix,u=Math.sqrt(l.data.size||J.wB),f=Math.sqrt(t);let h=0;const p=d[0];for(let e=0;e<f;e++)for(let t=0;t<f;t++){const n=t+e*f+2;if(t<u&&e<u){const r=d[t+e*u+2];0===r||0!==p&&r!==p?d[n]=0:(d[n]=r,h++)}else d[n]=0}for(let e=t+2;e<c;e++)d[e]=0;d[1]=h,0===h&&(d[0]=0),l.data.size=t",
+		"find": "const d=l.data.matrix,u=Math.sqrt(l.data.size||J.wB),f=Math.sqrt(t);let h=0;const m=d[0];for(let e=0;e<f;e++)for(let t=0;t<f;t++){const n=t+e*f+2;if(t<u&&e<u){const r=d[t+e*u+2];0===r||0!==m&&r!==m?d[n]=0:(d[n]=r,h++)}else d[n]=0}for(let e=t+2;e<c;e++)d[e]=0;d[1]=h,0===h&&(d[0]=0),l.data.size=t",
 		"operation": "replace",
-		"code": "const d=l.data.matrix,u=Math.sqrt(l.data.size||J.wB),f=Math.sqrt(t);const p=d[0];const origCount=d[1]||0;if(t<(l.data.size||J.wB)&&origCount>t)return;let h=0;for(let row=0;row<f;row++)for(let col=0;col<f;col++){const idx=col+row*f+2;if(col<u&&row<u){const val=d[col+row*u+2];0===val||0!==p&&val!==p?d[idx]=0:(d[idx]=val,h++)}else d[idx]=0}for(let idx=t+2;idx<c;idx++)d[idx]=0;if(h<origCount&&origCount<=t){for(let idx=2;idx<t+2&&h<origCount;idx++)if(0===d[idx]){d[idx]=p;h++}}d[1]=h,0===h&&(d[0]=0),l.data.size=t",
+		"code": "const d=l.data.matrix,u=Math.sqrt(l.data.size||J.wB),f=Math.sqrt(t);const m=d[0];const origCount=d[1]||0;if(t<(l.data.size||J.wB)&&origCount>t)return;let h=0;for(let row=0;row<f;row++)for(let col=0;col<f;col++){const idx=col+row*f+2;if(col<u&&row<u){const val=d[col+row*u+2];0===val||0!==m&&val!==m?d[idx]=0:(d[idx]=val,h++)}else d[idx]=0}for(let idx=t+2;idx<c;idx++)d[idx]=0;if(h<origCount&&origCount<=t){for(let idx=2;idx<t+2&&h<origCount;idx++)if(0===d[idx]){d[idx]=m;h++}}d[1]=h,0===h&&(d[0]=0),l.data.size=t",
 		"expectedMatches": 1
 	},
 	{

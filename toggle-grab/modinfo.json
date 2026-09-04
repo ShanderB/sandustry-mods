@@ -11,7 +11,7 @@
 	"configSchema": {
 		"enabled": {
 			"type": "boolean",
-			"default": true,
+			"default": false,
 			"label": "Toggle Mode",
 			"description": "When on, click once to grab and click again to drop. When off, the Grabber works normally (hold the mouse button)."
 		}
