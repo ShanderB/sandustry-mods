@@ -300,23 +300,68 @@
 //    for its own diagonal segments, confirmed by that same vanilla tech
 //    data never listing them individually either.
 //
+// 9. Liquids and gases CAN be launched - Advanced Filtered Launcher only,
+//    not a vanilla Launcher limitation this mod works around, but one this
+//    mod lifts, on purpose, scoped to just that one block type. Started
+//    from the same report point 9 used to document as "expected, inherited
+//    from vanilla": allowing liquids/gases through the filter let them
+//    occupy the tile but never actually get thrown. Reading
+//    simulation-worker.js to confirm that assumption found the opposite of
+//    what was expected - it's not an engine limitation at all, just a
+//    missing function call. Every matter type (Solid, Liquid, Gas, Slushy,
+//    Wisp, Powder, Static) has its own per-tick update function in one
+//    shared dispatch table; Solid, Slushy, Wisp and Powder all call the
+//    same launcher-pickup check this mod's own launching relies on
+//    (point 1) as the very first thing they do each tick - that's the
+//    actual mechanism that lets a Launcher grab Sand, WetSand, Petalium,
+//    FreezingIce, etc. Liquid's and Gas's own update functions simply never
+//    call it - confirmed neither Water nor Steam has an isTransportable:
+//    false anywhere in their definitions (nothing to override), the check
+//    is just never reached for them. The generic "become a flying Particle
+//    with velocity, revert to the original element on landing" machinery
+//    those four other matter types already go through doesn't care what
+//    matter type it started from, so there was no reason to expect it
+//    wouldn't work equally well for Liquid/Gas once actually wired in.
+//
+//    Three small patches add exactly that missing call to both the Liquid
+//    and Gas update functions (a fourth just introduces an alias so the
+//    call can be written without colliding with those functions' own local
+//    variable named the same as the module import it needs - purely a
+//    minification-collision workaround, changes no behavior by itself).
+//    Left alone, that would make every Launcher in the game - including
+//    the plain vanilla one and this mod's own plain Filtered Launcher -
+//    able to launch liquids/gases, which is a bigger change than intended.
+//    So a fifth patch adds one guard, inside the same launcher-pickup check
+//    every launcher type shares: if the element about to be picked up is a
+//    Liquid or Gas AND the launcher doing the picking up isn't specifically
+//    one of the Advanced Filtered Launcher's three registered structure
+//    types (Up/Left/Right), bail out before anything happens. Vanilla
+//    Launcher/Launcher Mk2 and the plain Filtered Launcher all still only
+//    ever throw solids, exactly as before - matching the real Filter vs.
+//    Advanced Filter split (only the Advanced tier deals with liquids/gases
+//    at all), asked for explicitly after the first version of this made
+//    both blocks able to launch them.
+//
 // HONESTY NOTE: everything above was verified by reading the game's own
 // code and, for points 3-6, by actually testing earlier versions in-game
 // and tracing the real cause of each reported bug. structures.register /
 // structureBehaviors.registerLauncherType / structures.getAtCell /
 // structures.update / api.tech.addDefinition are all real, current, public
 // Sandkit API calls (checked against the currently-installed version). The
-// seven patches in patches.json (four for point 5, two for point 8, one
-// for point 6) all touch undocumented internals the way this pack's
-// grabber-safe-resize/toggle-grab mods already do for similar reasons -
-// each validated with this repo's own validate-mod.js (runs the game's
-// real patch applier against the real installed files and checks the
-// patched result is still syntactically valid JS), but only actually
+// eleven patches in patches.json (four for point 5, two for point 8, one
+// for point 6, four for point 9) all touch undocumented internals the way
+// this pack's grabber-safe-resize/toggle-grab mods already do for similar
+// reasons - each validated with this repo's own validate-mod.js (runs the
+// game's real patch applier against the real installed files and checks
+// the patched result is still syntactically valid JS), but only actually
 // playing confirms the runtime behavior end to end - especially the
 // point-5 patches (does the native filter screen and its on-screen overlay
 // boxes really treat this mod's segments like a vanilla Filter/Advanced
-// Filter) and the point-8 ones (does the new tech node actually render,
-// gate correctly, and grant the right unlock on research) - neither is
+// Filter), the point-8 ones (does the new tech node actually render, gate
+// correctly, and grant the right unlock on research), and the point-9 ones
+// (do liquids/gases really fly out of the Advanced Filtered Launcher now,
+// and do a plain vanilla Launcher/Launcher Mk2 AND the plain Filtered
+// Launcher really still refuse them exactly as before) - none of that is
 // something static analysis alone can fully settle.
 
 const api = sandkit.api;
@@ -379,7 +424,9 @@ const FAMILIES = [
 		key: "filteredLauncher",
 		name: "Filtered Launcher",
 		description:
-			"Throws material like a Launcher, at the same speed - but only material this segment's own filter allows through. Equip it like a Filter to configure the Allow/Block list.",
+			"Throws material like a Launcher, at the same speed - but only material this segment's own filter allows through. Equip it like a Filter to configure the Allow/Block list. Only solid/physical material is ever thrown, same as a vanilla Launcher - liquids/gases can be allowed or blocked by the filter, but only the Advanced Filtered Launcher actually launches them.",
+		techDescription:
+			"Unlocks the Filtered Launcher, which works like a Launcher but only throws whatever element its own filter currently allows through.",
 		advanced: false,
 		velocity: VELOCITY,
 		softDropVelocity: SOFT_DROP_VELOCITY,
@@ -388,7 +435,9 @@ const FAMILIES = [
 		key: "advancedFilteredLauncher",
 		name: "Advanced Filtered Launcher",
 		description:
-			"Throws material like a Launcher Mk2, at the same (faster) speed - but only material this segment's own filter allows through. Equip it like an Advanced Filter to configure multiple allowed resources at once, including liquids and gases.",
+			"Throws material like a Launcher Mk2, at the same (faster) speed - but only material this segment's own filter allows through. Equip it like an Advanced Filter to configure multiple allowed resources at once. Unlike a vanilla Launcher (and unlike the plain Filtered Launcher), this one also throws liquids and gases if the filter allows them.",
+		techDescription:
+			"Unlocks the Advanced Filtered Launcher, a Launcher Mk2 that only throws whatever elements its own filter allows through - configure multiple at once, including liquids and gases, like the Advanced Filter.",
 		advanced: true,
 		velocity: VELOCITY_MK2,
 		softDropVelocity: SOFT_DROP_VELOCITY_MK2,
@@ -557,7 +606,7 @@ function registerTech(family, id, requires, cost) {
 	safe(() =>
 		api.i18n.register("en", {
 			[`tech|${id}|name`]: family.name,
-			[`tech|${id}|description`]: `Unlocks the ${family.name}.`,
+			[`tech|${id}|description`]: family.techDescription,
 		}),
 	);
 	safe(() =>

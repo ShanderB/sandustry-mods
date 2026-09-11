@@ -54,5 +54,37 @@
 		"operation": "replace",
 		"code": "if(y!==r.RJ.Particle)if(T){const t=T.runTickSharedBufferKey;if(!t){if(!v.machineryEngine.runLaunchers)return!1}else{const n=null===(m=null===(i=e.shared)||void 0===i?void 0:i.mods)||void 0===m?void 0:m[t];if(!n||n[0]!==v.meta.tick)return!1}}else if(!v.machineryEngine.runLaunchers)return!1;",
 		"expectedMatches": 1
+	},
+	{
+		"id": "add-launch-check-alias-for-liquid-gas-dispatch",
+		"file": "js/simulation-worker.js",
+		"find": "var n=i(90823),r=i(38163),s=i(96509),o=i(56383),a=i(93584),l=i(42074),c=i(36168),u=i(42266),d=i(71560),h=i(13653),p=i(32673),m=i(96948),f=i(8405);",
+		"operation": "replace",
+		"code": "var n=i(90823),r=i(38163),s=i(96509),o=i(56383),a=i(93584),l=i(42074),c=i(36168),u=i(42266),d=i(71560),h=i(13653),p=i(32673),m=i(96948),f=i(8405);const shanderLaunchCheck=a.v;",
+		"expectedMatches": 1
+	},
+	{
+		"id": "hook-liquid-elements-into-launcher-pickup",
+		"file": "js/simulation-worker.js",
+		"find": "[r.es.Liquid]:{update:(e,t,i,s,a,l)=>{const c=e.shared.sim.elementData;if(1===c.hasBeenUpdated[i])return;if(!(0,o.Do)(e,s,a))return;const{atHollow:u,filter:d}=(0,f.uw)(e,s,a);",
+		"operation": "replace",
+		"code": "[r.es.Liquid]:{update:(e,t,i,s,a,l)=>{const c=e.shared.sim.elementData;if(1===c.hasBeenUpdated[i])return;if(!(0,o.Do)(e,s,a))return;if((0,shanderLaunchCheck)(e,i))return;const{atHollow:u,filter:d}=(0,f.uw)(e,s,a);",
+		"expectedMatches": 1
+	},
+	{
+		"id": "hook-gas-elements-into-launcher-pickup",
+		"file": "js/simulation-worker.js",
+		"find": "[r.es.Gas]:{update:(e,t,i,n,s,a)=>{const l=e.shared.sim.elementData;if(1===l.hasBeenUpdated[i])return;if(!(0,o.Do)(e,n,s))return;const{atHollow:c,filter:u}=(0,f.uw)(e,n,s),d=u&&!u.isSpeedExempt(l.type[i]);",
+		"operation": "replace",
+		"code": "[r.es.Gas]:{update:(e,t,i,n,s,a)=>{const l=e.shared.sim.elementData;if(1===l.hasBeenUpdated[i])return;if(!(0,o.Do)(e,n,s))return;if((0,shanderLaunchCheck)(e,i))return;const{atHollow:c,filter:u}=(0,f.uw)(e,n,s),d=u&&!u.isSpeedExempt(l.type[i]);",
+		"expectedMatches": 1
+	},
+	{
+		"id": "restrict-liquid-gas-launching-to-advanced-filtered-launcher-only",
+		"file": "js/simulation-worker.js",
+		"find": "A=d.includes(S),T=A?null:h(e,S);if(!A&&!T)return!1;if((0,s.Y$)(e,x,b),",
+		"operation": "replace",
+		"code": "A=d.includes(S),T=A?null:h(e,S);if(!A&&!T)return!1;if(\"shanderAdvancedFilteredLauncherUp\"!==S&&\"shanderAdvancedFilteredLauncherLeft\"!==S&&\"shanderAdvancedFilteredLauncherRight\"!==S){const shanderMt=(a.m5[y]||{}).matterType;if(shanderMt===r.es.Liquid||shanderMt===r.es.Gas)return!1}if((0,s.Y$)(e,x,b),",
+		"expectedMatches": 1
 	}
 ]

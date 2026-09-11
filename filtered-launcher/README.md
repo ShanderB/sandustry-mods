@@ -336,6 +336,74 @@ Custo escolhido meio arbitrariamente (100 pro Filtered Launcher, 400
 pro Advanced) — ajuste em `main.js` (`registerTech(...)`) se quiser
 outro valor.
 
+### 7. Líquido/gás: primeiro achei que não dava, depois descobri que dava
+
+Documentei aqui uma limitação ("filtra, mas não lança") que depois se
+provou **não ser uma limitação real** — histórico completo porque foi
+um giro de 180 graus só de olhar o código com mais calma.
+
+Primeira versão desse item dizia: `affectsLiquid`/`affectsGas`
+controlam só a filtragem (permitir ou bloquear a entrada na célula),
+não o lançamento — testado no jogo, líquido/gás liberado no filtro
+não saía voando, só sólido saía, igual o Launcher vanilla. Concluí que
+era herdado do próprio `registerLauncherType` (item #1) e não mexi em
+nada.
+
+Pedido novo do usuário: "dá pra mudar isso?" — fui ler
+`simulation-worker.js` de novo, mais a fundo, pra confirmar antes de
+responder "não dá". E não é isso que o código mostra. Cada "tipo de
+matéria" (Solid, Liquid, Gas, Slushy, Wisp, Powder, Static) tem sua
+própria função de update por tick, numa tabela central só. Solid,
+Slushy, Wisp e Powder chamam a mesma checagem de "posso ser pego por
+um launcher" logo no início do próprio update — é isso que deixa
+Sand, WetSand, Petalium, FreezingIce serem lançados. **Liquid e Gas
+simplesmente nunca chamam essa checagem.** Não é `isTransportable:
+false` (conferi: nem Water nem Steam têm esse campo definido — o
+padrão sem ele já passaria na checagem), não é um bloqueio por
+`matterType` em lugar nenhum do caminho do launcher — é só uma
+chamada de função que nunca foi colocada ali pros dois. O mecanismo de
+"virar um projétil físico voando com velocidade e voltar a ser o
+elemento original ao pousar" já é genérico e usado por quatro tipos de
+matéria diferentes hoje, então não tinha motivo pra esperar que não
+funcionasse igual pra líquido/gás uma vez ligado.
+
+**A mudança:** três patches pequenos e aditivos ligam essa mesma
+checagem também nas funções de update de Liquid e Gas (mais um quarto
+patch, só um `const` de apelido, necessário porque as duas funções já
+usam a letra `a` como nome de parâmetro local, colidindo com o nome
+que o import do módulo da checagem usa — puramente cosmético,
+contorna uma colisão de minificação, não muda comportamento nenhum
+por si só). Só isso já bastaria, mas deixaria **qualquer** launcher do
+jogo (inclusive o vanilla) lançando líquido/gás — mudança de
+balanceamento do jogo base, não só destes dois blocos novos. Por
+isso, perguntei antes de mexer, e a resposta foi: só nestes dois
+blocos. Um quinto patch resolve isso: dentro da própria checagem
+compartilhada por todo launcher, se o elemento a pegar for líquido/gás
+e o launcher não for um dos tipos registrados por este mod, ele
+desiste antes de fazer qualquer coisa.
+
+**Ajuste seguinte:** "esses dois blocos" virou "só o Advanced". Pedido
+explícito: o MK1 (Filtered Launcher comum) não deveria lançar líquido
+nem gás, só o MK2 (Advanced Filtered Launcher) — igual a separação
+real entre Filter (só sólido) e Advanced Filter (sólido + líquido +
+gás) que os dois blocos já espelham em tudo mais. Troquei a condição
+do quinto patch: em vez de checar "é ou não é um tipo registrado por
+este mod" (`!T`, verdadeiro pros dois blocos), ele agora checa o tipo
+de estrutura (`S`) direto contra os três ids do Advanced
+(`shanderAdvancedFilteredLauncherUp/Left/Right`) — só esses três
+passam; qualquer outro (vanilla **ou** o Filtered Launcher comum deste
+mesmo mod) cai no bloqueio. Um patch a menos de superfície de mudança
+do que parece: é a mesma checagem de antes, só compara contra uma
+lista de 3 nomes fixos em vez de "registrado ou não".
+
+Resultado: só o Advanced Filtered Launcher realmente lança líquido/gás
+quando o filtro permite (documentado nas descrições in-game e na
+descrição do Workshop). O Filtered Launcher comum continua podendo
+**filtrar** líquido/gás (a config `affectsLiquidsAndGases` ainda existe
+e ainda controla se aquele material pode ocupar a célula), só não
+lança — igual ao Filter vanilla, que também nunca lançou nada sozinho.
+Launcher e Launcher Mk2 vanilla não mudam em nada.
+
 ## Sobre o arrastar escolher a direção
 
 `buildModes` usa só `"line"` (vertical/diagonal) — não os
@@ -358,24 +426,27 @@ primeira versão sem nenhum código de arrasto próprio.
 ## Ponto de honestidade
 
 Tudo acima foi confirmado lendo o próprio código do jogo e, pros itens
-3, 4, 5 e 6 da lista de bugs, testando de fato versões anteriores no
+3, 4, 5, 6 e 7 da lista de bugs, testando de fato versões anteriores no
 jogo e rastreando a causa real de cada relato. `structures.register` /
 `structureBehaviors.registerLauncherType` / `structures.getAtCell` /
 `structures.update` / `tech.addDefinition` são chamadas públicas reais
-e atuais do Sandkit. Os sete patches em `patches.json` (quatro do item
-#3/#5, dois do item #6, um do item #4) mexem em território não
-documentado, do mesmo jeito que `grabber-safe-resize`/`toggle-grab`
-deste pacote já fazem por motivos parecidos — cada um validado com o
-`validate-mod.js` deste repositório (que roda o aplicador de patch de
-verdade do próprio jogo contra os arquivos instalados de verdade, e
-confere que o resultado remendado ainda é JavaScript sintaticamente
-válido), mas só jogar de fato confirma o comportamento em tempo de
-execução ponta a ponta — principalmente os do item #3/#5 ("a tela
-nativa, as caixinhas clicáveis, a escolha de elemento e o modo
-avançado tratam este mod igual a um Filter/Advanced Filter vanilla")
-e os do item #6 ("a tech nova aparece, trava/libera certo, e realmente
-desbloqueia o bloco ao pesquisar") — nenhum dos dois é algo que dá pra
-confirmar 100% só lendo código.
+e atuais do Sandkit. Os onze patches em `patches.json` (quatro do item
+#3/#5, dois do item #6, um do item #4, quatro do item #7) mexem em
+território não documentado, do mesmo jeito que
+`grabber-safe-resize`/`toggle-grab` deste pacote já fazem por motivos
+parecidos — cada um validado com o `validate-mod.js` deste
+repositório (que roda o aplicador de patch de verdade do próprio jogo
+contra os arquivos instalados de verdade, e confere que o resultado
+remendado ainda é JavaScript sintaticamente válido), mas só jogar de
+fato confirma o comportamento em tempo de execução ponta a ponta —
+principalmente os do item #3/#5 ("a tela nativa, as caixinhas
+clicáveis, a escolha de elemento e o modo avançado tratam este mod
+igual a um Filter/Advanced Filter vanilla"), os do item #6 ("a tech
+nova aparece, trava/libera certo, e realmente desbloqueia o bloco ao
+pesquisar") e os do item #7 ("líquido/gás realmente sai voando só do
+Advanced Filtered Launcher, e o Launcher/Launcher Mk2 vanilla e o
+Filtered Launcher comum continuam recusando exatamente como antes") —
+nenhum dos três é algo que dá pra confirmar 100% só lendo código.
 
 **Testa isso:**
 
@@ -408,10 +479,26 @@ confirmar 100% só lendo código.
    o resumo "Allow ↓ ...".
 7. Joga os elementos liberados nos respectivos blocos e confirma que
    são lançados; joga outra coisa e confirma que fica bloqueada.
+8. Libera um líquido (ex: Water) ou gás (ex: Steam) no filtro do
+   **Advanced Filtered Launcher** e joga um pouco nele: confirma que
+   **sai voando** igual um sólido lançado no passo 7, virando um
+   "projétil" físico até pousar.
+9. Liga `affectsLiquidsAndGases` na config do mod e libera o mesmo
+   líquido/gás no filtro do **Filtered Launcher comum** (MK1) — confirma
+   que ele entra/passa pela célula normalmente (a filtragem funciona),
+   mas **não** sai voando. Testa o mesmo material também num **Launcher
+   vanilla comum** (não deste mod) — confirma que ele também continua
+   recusando, exatamente como sempre se comportou. Se qualquer um dos
+   dois passar a lançar, o quinto patch do item #7 (o guard) não está
+   restringindo direito.
 
 Se os passos 1-2 não aparecerem certos, os patches do item #6 precisam
 de outro olhar; se os passos 3-5 falharem, é o item #3/#5; se o passo
-7 não lançar nada mesmo liberado, é o patch do item #4.
+7 não lançar nada mesmo liberado, é o patch do item #4; se o passo 8
+não lançar líquido/gás no Advanced, é o item #7 (patches de
+Liquid/Gas); se o passo 9 mostrar o Filtered Launcher comum ou o
+Launcher vanilla lançando líquido/gás, é o guard do item #7 que
+precisa de outro olhar.
 
 ## Publicar no Steam Workshop
 
