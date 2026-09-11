@@ -1,0 +1,58 @@
+[
+	{
+		"id": "recognize-filtered-launcher-for-filter-config-panel",
+		"file": "js/bundle.js",
+		"find": "mk=[\"filterWall\",\"filterWallMk2\"]",
+		"operation": "replace",
+		"code": "mk=[\"filterWall\",\"filterWallMk2\",\"shanderFilteredLauncherUp\",\"shanderFilteredLauncherLeft\",\"shanderFilteredLauncherRight\",\"shanderAdvancedFilteredLauncherUp\",\"shanderAdvancedFilteredLauncherLeft\",\"shanderAdvancedFilteredLauncherRight\"]",
+		"expectedMatches": 1
+	},
+	{
+		"id": "activate-filter-config-panel-when-equipping-filtered-launcher",
+		"file": "js/bundle.js",
+		"find": "const m=[r.ev.FilterRight,r.ev.FilterLeft,\"filterRightMk2\",\"filterLeftMk2\"]",
+		"operation": "replace",
+		"code": "const m=[r.ev.FilterRight,r.ev.FilterLeft,\"filterRightMk2\",\"filterLeftMk2\",\"shanderFilteredLauncherUp\",\"shanderFilteredLauncherLeft\",\"shanderFilteredLauncherRight\",\"shanderAdvancedFilteredLauncherUp\",\"shanderAdvancedFilteredLauncherLeft\",\"shanderAdvancedFilteredLauncherRight\"]",
+		"expectedMatches": 1
+	},
+	{
+		"id": "keep-filtered-launcher-active-after-picking-an-element",
+		"file": "js/bundle.js",
+		"find": "e.session.building.activeStructureType=w?\"filterRightMk2\":N.ev.FilterRight,",
+		"operation": "replace",
+		"code": "e.session.building.activeStructureType=bk(e.session.building.activeStructureType)?e.session.building.activeStructureType:w?\"filterRightMk2\":N.ev.FilterRight,",
+		"expectedMatches": 1
+	},
+	{
+		"id": "treat-advanced-filtered-launcher-as-mk2-tier",
+		"file": "js/bundle.js",
+		"find": "Uk=[\"filterLeftMk2\",\"filterRightMk2\",\"filterWallMk2\"]",
+		"operation": "replace",
+		"code": "Uk=[\"filterLeftMk2\",\"filterRightMk2\",\"filterWallMk2\",\"shanderAdvancedFilteredLauncherUp\",\"shanderAdvancedFilteredLauncherLeft\",\"shanderAdvancedFilteredLauncherRight\"]",
+		"expectedMatches": 1
+	},
+	{
+		"id": "place-filtered-launcher-tech-node-below-filters",
+		"file": "js/bundle.js",
+		"find": "[null,null,null,null,r.xQ.KineticPress,r.xQ.Flamethrower,null,null,null]",
+		"operation": "replace",
+		"code": "[null,null,\"shanderFilteredLauncherTech\",null,r.xQ.KineticPress,r.xQ.Flamethrower,null,null,null]",
+		"expectedMatches": 1
+	},
+	{
+		"id": "place-advanced-filtered-launcher-tech-node-below-advanced-filters",
+		"file": "js/bundle.js",
+		"find": "[null,null,null,r.xQ.ConveyorsMk2,null,null,r.xQ.Corraller,T(r.xQ.Map,r.xQ.Corraller),null]",
+		"operation": "replace",
+		"code": "[null,null,\"shanderAdvancedFilteredLauncherTech\",r.xQ.ConveyorsMk2,null,null,r.xQ.Corraller,T(r.xQ.Map,r.xQ.Corraller),null]",
+		"expectedMatches": 1
+	},
+	{
+		"id": "custom-launcher-types-without-a-tick-buffer-use-runLaunchers-gate",
+		"file": "js/simulation-worker.js",
+		"find": "if(y!==r.RJ.Particle)if(T){const t=T.runTickSharedBufferKey;if(!t)return!1;{const n=null===(m=null===(i=e.shared)||void 0===i?void 0:i.mods)||void 0===m?void 0:m[t];if(!n||n[0]!==v.meta.tick)return!1}}else if(!v.machineryEngine.runLaunchers)return!1;",
+		"operation": "replace",
+		"code": "if(y!==r.RJ.Particle)if(T){const t=T.runTickSharedBufferKey;if(!t){if(!v.machineryEngine.runLaunchers)return!1}else{const n=null===(m=null===(i=e.shared)||void 0===i?void 0:i.mods)||void 0===m?void 0:m[t];if(!n||n[0]!==v.meta.tick)return!1}}else if(!v.machineryEngine.runLaunchers)return!1;",
+		"expectedMatches": 1
+	}
+]
