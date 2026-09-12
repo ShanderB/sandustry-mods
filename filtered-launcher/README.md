@@ -651,47 +651,154 @@ uma pilha por fora dela; é assim que a física do jogo funciona pra
 qualquer estrutura desse tipo. Não é algo que dá pra corrigir só
 mexendo nos blocos deste mod.
 
+### 12. Relato real de usuário: com o mod ativo, um Filter Wall vanilla em Block deixava tudo passar
+
+Um jogador removeu o bloco deste mod do mapa e recolocou só pra provar
+o ponto: com este mod **ativo**, construir um Filter (Mk1 ou Mk2)
+vanilla no **modo de construção "wall"**, configurado pra **Block**
+(ex: bloquear Void Petal), deixava o Void Petal passar de qualquer
+jeito. Confirmado alternando o mod desativado/ativado com a mesma
+estrutura vanilla no lugar — só acontecia com o mod ligado.
+
+**Causa raiz:** o patch de autorização de movimento do item #10 (o que
+corrige esteira/conveyor) mexe numa função **compartilhada** por
+qualquer tile em modo filtrado, não só pelos blocos deste mod — ele
+muda o ramo de "não bate no filtro" pra também respeitar o bit de
+pass-through, em vez de recusar sempre. O aviso de honestidade do item
+#10 já dizia "conferi que nada mais no jogo liga pass-through num
+filtro não-vazio" — só que essa checagem olhou só quem **lê** o bit,
+não parou pra olhar se o **próprio jogo vanilla** já liga esse mesmo
+bit em algo. Relendo o registro das estruturas vanilla direto em
+`bundle.js` (não só o deste mod) achei a resposta: `filterWall`,
+`filterWallMk2` e **`critterFence`** já vêm de fábrica com
+`defaultData:{filterPassThrough:true}` — um mecanismo vanilla de
+verdade, sem nenhuma relação com este mod, que existe justamente pra
+deixar material caindo por gravidade atravessar a parede livremente
+enquanto ainda **bloqueia** o que chega por esteira/conveyor (faz
+sentido pra Critter Fence: precisa segurar criatura/material
+transportado atravessando de lado, mas deixar cair material solto por
+cima através dos vãos; Filter Wall segue o mesmo desenho assimétrico).
+O patch do item #10 anulou essa assimetria pras três estruturas
+vanilla em qualquer save com este mod instalado — mesmo sem nenhum
+bloco deste mod sequer estar construído — derrubando silenciosamente
+o modo Block delas contra material vindo por esteira.
+
+**Correção:** removi esse patch por completo. A função de autorização
+de movimento volta a ser exatamente a original do jogo, bit a bit. Os
+próprios tiles deste mod agora seguem a mesma assimetria que essas três
+estruturas vanilla já usam: pass-through continua 100% confiável pra
+material caindo por gravidade, mas material vindo por esteira/conveyor
+que não bate no filtro pode voltar a ser bloqueado no tile, igual um
+Filter Wall ou Critter Fence vanilla já se comportam. Agora que o
+desenho real do jogo é conhecido, isso deixa de ser uma limitação pra
+contornar e passa a ser **paridade** com o que o próprio jogo já faz
+pras estruturas dele que usam esse mesmo mecanismo — uma posição bem
+mais defensável do que uma exceção só deste mod que, sem querer,
+quebrava conteúdo de outra estrutura. A limitação de timing do item
+#11 (item bom escapando ocasionalmente numa esteira rápida) não muda
+em nada com isso — ela só existia no ramo de "bate no filtro", que
+esse patch removido nunca tocava.
+
+### 13. A remoção do item #12 corrigiu o vanilla, mas quebrou a esteira dos nossos próprios blocos — corrigido de vez
+
+Reportado na hora: depois da remoção do item #12, material que **não
+bate** no filtro voltou a ficar **travado antes de entrar** no
+Filtered Launcher quando vem por esteira, em vez de atravessar — ou
+seja, o item #12 trocou um bug real por outro. O comportamento certo,
+como pedido, é: material que não bate **atravessa** o tile
+normalmente (esteira ou gravidade, tanto faz); só o que **bate** é
+lançado; o que está na lista de **Block** simplesmente não é lançado
+(mas também não fica preso). Jogar fora o patch inteiro (item #12) foi
+covardia demais — a correção certa era **restringir** esse mesmo patch
+só aos blocos deste mod, não removê-lo.
+
+O bloqueio até então era: "essa função só enxerga os bits do tile
+(modo/id-do-filtro/bit de pass-through), sem nenhuma pista de qual
+**tipo de estrutura** é dona do tile" — verdade pros bits crus, só que
+a própria função já calcula `v`, o **tipo numérico de bloco** do tile,
+uma linha antes (ela mesma precisa disso pra suas próprias checagens de
+"tile vazio"/"é ouro"). O mesmo módulo que essa função já importa
+(módulo `38394`, o mesmo por trás de `writeStructureToGrid`/
+`getBlockAccess`/`isFilterPassThrough` etc.) também exporta
+`getTypeFromIndex`, que transforma esse número de volta no **tipo de
+verdade** da estrutura — confirmado achando esse mesmo padrão já usado
+em outro lugar do próprio jogo pra uma checagem vanilla sem relação
+nenhuma (`getTypeFromIndex(getBlockTypeAtPos(...))===Foundation`), e é
+exatamente a mesma chamada que o patch do launcher deste mod (o
+primeiro patch do item #10/12, `gate-launch-on-tile-filter-match...`)
+já usa pra saber seu próprio tipo de estrutura — só que chegando lá por
+um nome de variável local diferente, nessa segunda função.
+
+**Correção:** reintroduzi o patch de autorização de movimento do item
+#12, só que agora, em vez de respeitar pass-through incondicionalmente
+no ramo de rejeição, ele também resolve `getTypeFromIndex(v)` e só
+libera esse ramo quando o tipo do tile é **um dos seis ids registrados
+por este mod**. `filterWall`/`filterWallMk2`/`critterFence` (ou
+qualquer outra coisa que já venha ou ganhe pass-through ligado) caem no
+comportamento vanilla original, intocado — sempre `p` (bloqueado)
+numa rejeição de verdade — enquanto os tiles deste mod recuperam o
+pass-through por esteira que tinham antes. Essa é a versão que devia
+ter sido o item #12 desde o início; a remoção total do item anterior
+fica registrada acima como o passo intermediário (que passou do ponto),
+não como o design final.
+
 ## Ponto de honestidade
 
 Tudo acima foi confirmado lendo o próprio código do jogo e, pros itens
-3, 4, 5, 6, 7, 8, 9, 10 e 11 da lista de bugs, testando de fato
+3, 4, 5, 6, 7, 8, 9, 10, 11, 12 e 13 da lista de bugs, testando de fato
 versões anteriores no jogo e rastreando a causa real de cada relato.
 `structures.register` / `structureBehaviors.registerLauncherType` /
 `structures.getAtCell` / `structures.update` / `tech.addDefinition` são
 chamadas públicas reais e atuais do Sandkit. Os **doze** patches em
 `patches.json` (quatro do item #3/#5, dois do item #6, um do item #4,
 quatro do item #7 — um deles reescrito pelo item #9 pra ficar
-resistente a ordem — um do item #10 para a checagem de filtro no
-launcher, e um mais pro patch de autorização de movimento do item #10)
-mexem em território não documentado, do mesmo jeito que
-`grabber-safe-resize`/`toggle-grab` deste pacote já fazem por motivos
-parecidos. O item #11 registra uma tentativa de simplificar esse
-mesmo conjunto de patches (reduzindo pra onze) que foi testada,
-piorou a experiência real e foi revertida — o histórico de ambas as
-versões fica registrado acima porque é assim que a decisão de verdade
-foi tomada, mesmo o resultado final sendo o design "antigo". Cada
-patch é validado com o `validate-mod.js` deste repositório (que roda o
-aplicador de patch de verdade do próprio jogo contra os arquivos
-instalados de verdade, e confere que o resultado remendado ainda é
-JavaScript sintaticamente válido), mas só jogar de fato confirma o
-comportamento em tempo de execução ponta a ponta — principalmente os
-do item #3/#5 ("a tela nativa, as caixinhas clicáveis, a escolha de
-elemento e o modo avançado tratam este mod igual a um Filter/Advanced
-Filter vanilla"), os do item #6 ("a tech nova aparece, trava/libera
-certo, e realmente desbloqueia o bloco ao pesquisar"), os do item #7
-("líquido/gás realmente sai voando só do Advanced Filtered Launcher, e
-o Launcher/Launcher Mk2 vanilla e o Filtered Launcher comum continuam
-recusando exatamente como antes"), o do item #8 ("arrastar um
-retângulo realmente planta um bloco inteiro de launchers, com Up em
-cima e Left/Right alimentando, ou uma parede inteira de lado"), o do
-item #9 (a tela de filtro funciona mesmo com Solaryum ativado) e os do
-item #10 ("material que não bate no filtro passa pelo tile livremente,
-e o que bate ainda é lançado corretamente na maior parte do tempo,
-com a limitação de timing conhecida do item #11 em esteiras muito
-rápidas") — nenhum desses é algo que dá pra confirmar 100% só lendo
-código, e esse mecanismo em particular já passou por uma rodada de
-redesenho e reversão via teste real, então continua sendo a parte
-deste mod que mais merece atenção antes de confiar cegamente.
+resistente a ordem —, um do item #10 para a checagem de filtro no
+launcher, e mais um do item #13 para a autorização de movimento
+restrita aos blocos deste mod) mexem em território não documentado, do
+mesmo jeito que `grabber-safe-resize`/`toggle-grab` deste pacote já
+fazem por motivos parecidos. O item #11 registra uma tentativa de
+simplificar esse mesmo conjunto de patches que foi testada, piorou a
+experiência real e foi revertida; o item #12 registra um segundo patch
+(o de autorização de movimento do item #10) que precisou ser removido
+de vez depois de um relato real mostrar que ele quebrava o modo Block
+de três estruturas vanilla (`filterWall`, `filterWallMk2`,
+`critterFence`) que já usavam o mesmo campo por conta própria; e o
+item #13 mostra que essa remoção foi longe demais — quebrou a esteira
+dos próprios blocos deste mod de novo — e reintroduz o mesmo patch de
+autorização de movimento, agora restrito por tipo de estrutura via
+`getTypeFromIndex`, resolvendo os dois relatos ao mesmo tempo sem
+tocar em conteúdo vanilla. O histórico de todas as versões fica
+registrado acima porque é assim que a decisão de verdade foi tomada,
+mesmo tendo passado por um patch a mais, depois a menos, depois de
+volta. Cada patch é validado com o `validate-mod.js` deste repositório
+(que roda o aplicador de patch de verdade do próprio jogo contra os
+arquivos instalados de verdade, e confere que o resultado remendado
+ainda é JavaScript sintaticamente válido), mas só jogar de fato
+confirma o comportamento em tempo de execução ponta a ponta —
+principalmente os do item #3/#5 ("a tela nativa, as caixinhas
+clicáveis, a escolha de elemento e o modo avançado tratam este mod
+igual a um Filter/Advanced Filter vanilla"), os do item #6 ("a tech
+nova aparece, trava/libera certo, e realmente desbloqueia o bloco ao
+pesquisar"), os do item #7 ("líquido/gás realmente sai voando só do
+Advanced Filtered Launcher, e o Launcher/Launcher Mk2 vanilla e o
+Filtered Launcher comum continuam recusando exatamente como antes"), o
+do item #8 ("arrastar um retângulo realmente planta um bloco inteiro
+de launchers, com Up em cima e Left/Right alimentando, ou uma parede
+inteira de lado"), o do item #9 (a tela de filtro funciona mesmo com
+Solaryum ativado), e os do item #10/#12/#13 juntos ("material que não
+bate no filtro passa pelo tile livremente por gravidade **e** por
+esteira nos blocos deste mod, o que bate ainda é lançado corretamente
+na maior parte do tempo com a limitação de timing conhecida do item
+#11 em esteiras muito rápidas, **e** um Filter Wall/Filter Wall
+Mk2/Critter Fence vanilla configurado pra Block continua bloqueando
+material vindo por esteira, com este mod instalado e ativo") — nenhum
+desses é algo que dá pra confirmar 100% só lendo código, e esse
+mecanismo de pass-through em particular já passou por uma rodada de
+redesenho e reversão via teste real, uma remoção que corrigiu o
+vanilla mas quebrou o comportamento esperado deste mod, e uma reescrita
+restrita por tipo pra resolver as duas coisas de vez, então continua
+sendo, de longe, a parte deste mod que mais merece atenção antes de
+confiar cegamente.
 
 **Testa isso:**
 
@@ -748,8 +855,9 @@ deste mod que mais merece atenção antes de confiar cegamente.
     ele ativado. Isso é o que estava quebrado no relato real que gerou
     o item #9 — confirma que voltou a funcionar mesmo com um desses
     dois mods ligados, sem precisar desativar nada.
-12. Configura o filtro pra permitir só um recurso (ex: Gold) e joga
-    **outra coisa** nele (ex: Sand) — confirma que o Sand **não** é
+12. Configura o filtro pra permitir só um recurso (ex: Gold) e **derruba
+    por gravidade** outra coisa nele (ex: solta Sand de cima, sem
+    esteira nenhuma envolvida) — confirma que o Sand **não** é
     bloqueado na frente do bloco: ele deve continuar se
     movendo/caindo através do tile normalmente, sem ser lançado. Joga
     Gold em seguida e confirma que esse sim é lançado. Testa também no
@@ -757,21 +865,35 @@ deste mod que mais merece atenção antes de confiar cegamente.
     um líquido/gás não incluído no filtro: deve passar pelo tile sem
     ser bloqueado nem lançado (só o Advanced lança líquido/gás, item
     #7).
-13. Monta uma linha **esteira → Filtered Launcher → esteira**
-    (horizontal, três tiles). Manda um material que **não bate** no
-    filtro pela esteira 1 — confirma que ele atravessa o launcher e
-    chega na esteira 3 em vez de ficar travado na esteira 1. Depois
-    manda vários materiais que **batem** no filtro pela mesma esteira
-    numa esteira MK1 (não precisa ser MK2) — confirma que a maioria é
-    lançada corretamente; um escape ocasional é a limitação **conhecida
-    e aceita** do item #11 (mitigável colocando mais de um Filtered
-    Launcher em fileira), não um patch quebrado. Testa também numa
-    coluna vertical de launchers empilhados.
-14. Coloca uma camada de material que não bate no filtro **em cima**
+13. Monta uma **coluna vertical** de Filtered Launcher alimentada só
+    por gravidade (sem esteira) com uma mistura de material que bate e
+    material que não bate no filtro caindo nela — confirma que o que
+    não bate atravessa livremente e o que bate é lançado corretamente
+    na maior parte do tempo; um escape ocasional do que bate é a
+    limitação **conhecida e aceita** do item #11 (mitigável colocando
+    mais de um Filtered Launcher em fileira), não um patch quebrado.
+14. Monta uma linha **esteira → Filtered Launcher → esteira**
+    (horizontal, três tiles) e manda uma mistura de materiais pela
+    esteira 1. Material que **não bate** no filtro deve **atravessar**
+    o launcher normalmente e chegar na esteira 3 (voltou a funcionar
+    graças ao item #13); material que **bate** deve continuar sendo
+    lançado corretamente quando chega por esteira, com o mesmo escape
+    ocasional **conhecido e aceito** do item #11 numa esteira bem
+    rápida. Testa também numa coluna vertical de launchers empilhados.
+15. Coloca uma camada de material que não bate no filtro **em cima**
     de material que bate, numa pilha, alimentando o Filtered Launcher
     por baixo — confirma que o launcher realmente não consegue pegar o
     material enterrado (comportamento esperado, igual um Filter
     vanilla faria - ver item #11) e não é um sinal de que algo quebrou.
+16. **Regressão dos itens #12/#13:** construa um Filter (Mk1 ou Mk2)
+    **vanilla**, no modo de construção **"wall"**, com este mod ativo.
+    Configura pra **Block** um recurso específico (ex: bloquear Sand) e
+    alimenta ele por **esteira/conveyor**. Confirma que o Sand continua
+    **bloqueado** na frente da parede, exatamente como aconteceria sem
+    este mod instalado — se ele passar direto, o bug do item #12
+    voltou (o patch do item #13 deixou de restringir corretamente por
+    tipo de estrutura). Repete o mesmo teste com um **Critter Fence**
+    vanilla, se tiver acesso a ele.
 
 Se os passos 1-2 não aparecerem certos, os patches do item #6 precisam
 de outro olhar; se os passos 3-5 falharem, é o item #3/#5 (e, se só
@@ -784,12 +906,20 @@ precisa de outro olhar; se o passo 10 não mostrar os modos Rect
 Up/Rect Side ou plantar errado, é o `buildModes` do item #8; se o
 passo 11 falhar, os patches reescritos do item #9 ainda não bastam
 pra esse combo de mods específico; se o passo 12 mostrar o que não
-bate no filtro sendo bloqueado (em vez de passar) ou o que bate nunca
-sendo lançado, os patches do item #10 precisam de outro olhar; se o
-passo 13 mostrar material bom escapando **com muita frequência** (não
-só ocasionalmente numa esteira bem rápida), é sinal de que algo além
-da limitação conhecida do item #11 está errado; o passo 14 é esperado
-sempre dar esse resultado (ver item #11) — não é um patch quebrado.
+bate no filtro sendo bloqueado por gravidade (em vez de passar) ou o
+que bate nunca sendo lançado, os patches do item #10 precisam de outro
+olhar; se o passo 13 mostrar material bom escapando **com muita
+frequência** (não só ocasionalmente), é sinal de que algo além da
+limitação conhecida do item #11 está errado; se o passo 14 mostrar
+material que **não bate** ficando travado na esteira em vez de
+atravessar, o patch restrito por tipo do item #13 não está reconhecendo
+os blocos deste mod direito; se o que **bate** parar de ser lançado ao
+chegar por esteira, é o mesmo patch que precisa de outro olhar; o passo
+15 é esperado sempre dar esse resultado (ver item #11) — não é um
+patch quebrado; se o passo 16 mostrar o Filter Wall/Filter Wall
+Mk2/Critter Fence vanilla deixando material bloqueado passar, o patch
+de autorização de movimento do item #13 não está restringindo pelo
+tipo de estrutura corretamente e precisa de outro olhar.
 
 ## Publicar no Steam Workshop
 

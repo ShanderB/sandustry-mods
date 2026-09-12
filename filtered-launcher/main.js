@@ -457,7 +457,8 @@
 //     pass-through too, closing that gap - confirmed against every call
 //     site of that function to make sure no other installed content
 //     exercises pass-through-plus-non-empty-filter and would be affected by
-//     the change.
+//     the change. (This patch was later found to have a real conflict with
+//     unrelated vanilla content and was removed - see point 13.)
 //
 //     A different approach - inverting the filter's *mode* only for the
 //     tile-encode step (so vanilla's own block-mode logic holds the wanted
@@ -491,6 +492,83 @@
 //     nothing in vanilla can "see" or reorder a pile from outside it. Not
 //     something a patch to this mod's own blocks can fix.
 //
+// 13. BUG (real user report, real fix): a player noticed that once this mod
+//     was installed, a vanilla Filter (Mk1 or Mk2) built in Wall mode and
+//     configured to Block a specific element let that element straight
+//     through anyway - confirmed by toggling this mod off/on with the same
+//     vanilla structure in place, isolating it to this mod being active.
+//     Traced to the movement-authorization patch from point 12's second
+//     paragraph above: it changed the shared function's rejection branch to
+//     honor the tile's pass-through bit for *any* tile using that function,
+//     not just this mod's own segments. Re-reading bundle.js's own vanilla
+//     structure registrations (not just this mod's) found the real
+//     conflict: filterWall, filterWallMk2 and critterFence already ship
+//     with `defaultData:{filterPassThrough:true}` in the base game, for a
+//     genuine vanilla reason unrelated to this mod - it lets gravity-fed
+//     material fall straight through the tile while still stopping
+//     belt/conveyor-fed material that doesn't match (a Critter Fence needs
+//     to hold back creatures/conveyed material crossing it while still
+//     letting loose material drop past through gaps under gravity; Filter
+//     Wall follows the same asymmetric design). Point 12's belt-transport
+//     patch overrode that asymmetry for all three vanilla types on any save
+//     with this mod installed - regardless of whether this mod's own blocks
+//     were even placed - silently defeating their Block-mode filtering
+//     against belt-fed material. The point-12 honesty note's own check (no
+//     other content uses pass-through-plus-non-empty-filter) missed this
+//     because it only checked what reads the bit, not what the base game
+//     itself already ships it on by default.
+//
+//     Fix: removed that patch entirely. The shared movement-authorization
+//     function is back to bit-for-bit original vanilla behavior. This mod's
+//     own launcher tiles now follow the exact same asymmetry those three
+//     vanilla structures already rely on - pass-through is fully reliable
+//     for gravity-fed material, but belt/conveyor-fed non-matching material
+//     can once again be blocked at the tile, same as a vanilla Filter Wall
+//     or Critter Fence would be. Now that the real vanilla design is known,
+//     this isn't a workaround for a shortcoming - it's parity with how
+//     vanilla's own pass-through-capable structures already behave, which
+//     is a more defensible position than a mod-only exception that broke
+//     unrelated content. Point 12's tick-timing note (matching elements
+//     occasionally slipping past a slow launch pulse on a fast belt) is
+//     unaffected by this - it only ever concerned the branch where the
+//     element *does* match, which this removed patch never touched.
+//
+// 14. Point 13's full removal fixed the vanilla regression but reopened the
+//     original point-12 complaint for this mod's own blocks: non-matching
+//     material fed by a belt went back to getting stuck in front of the
+//     tile instead of passing through - reported immediately after point 13
+//     shipped. Full removal traded one real bug for reintroducing another;
+//     the right fix is scoping point 12's patch to only this mod's own
+//     segments, not throwing it away.
+//
+//     The blocker had been "the movement-authorization function only sees
+//     packed tile flags (mode/filter-config-id/pass-through bit), with no
+//     idea which structure type owns the tile" - true of the access word,
+//     but the function already computes `v`, this tile's numeric block
+//     type, one line earlier (needed for its own empty-tile/gold checks).
+//     The same module that function imports (module 38394, the one behind
+//     writeStructureToGrid/getBlockAccess/isFilterPassThrough/etc.) also
+//     exports `getTypeFromIndex`, which turns that number back into the
+//     structure's actual type - confirmed by finding it already relied on
+//     elsewhere in this exact form for an unrelated vanilla check
+//     (`getTypeFromIndex(getBlockTypeAtPos(...))===Foundation`), and it's
+//     the very same call this mod's own launcher-tick patch (point 12's
+//     first patch, gate-launch-on-tile-filter-match...) already uses to get
+//     its own structure type string for comparison - just reached through a
+//     different local variable name in this second function.
+//
+//     Fix: reinstated point 12's belt-transport patch, but instead of
+//     unconditionally honoring pass-through on the rejection branch, it now
+//     also resolves `getTypeFromIndex(v)` and only takes that branch when
+//     the tile's type is one of this mod's own six registered structure
+//     ids. filterWall/filterWallMk2/critterFence (or anything else that
+//     ships or gets pass-through set) fall through to the untouched
+//     original vanilla behavior - always `p` (blocked) on a real mismatch -
+//     while this mod's own tiles get the intended belt pass-through back.
+//     This is the version that should have shipped as point 12 in the first
+//     place; point 13's full removal is kept in the history above as the
+//     (overcorrected) intermediate step, not as the final design.
+//
 // HONESTY NOTE: everything above was verified by reading the game's own
 // code and, for points 3-6, by actually testing earlier versions in-game
 // and tracing the real cause of each reported bug. structures.register /
@@ -500,29 +578,34 @@
 // twelve patches in patches.json (four for point 5, two for point 8, one
 // for point 6, four for point 9 - point 10 rewrote several of the
 // point-5/6/9 ones to be order-resilient, one for point 12's launcher-side
-// filter check, and one more for point 12's follow-up fix to the shared
-// movement-authorization function) all touch undocumented internals the way
-// this pack's grabber-safe-resize/toggle-grab mods already do for similar
-// reasons - each validated with this repo's own validate-mod.js (runs the
-// game's real patch applier against the real installed files and checks the
-// patched result is still syntactically valid JS), but only actually
-// playing confirms the runtime behavior end to end - especially the point-5
-// patches (does the native filter screen and its on-screen overlay boxes
-// really treat this mod's segments like a vanilla Filter/Advanced Filter),
-// the point-8 ones (does the new tech node actually render, gate correctly,
-// and grant the right unlock on research), the point-9 ones (do
-// liquids/gases really fly out of the Advanced Filtered Launcher now, and
-// do a plain vanilla Launcher/Launcher Mk2 AND the plain Filtered Launcher
-// really still refuse them exactly as before), the point-10 one (does this
-// mod's filter screen now work correctly alongside Solaryum enabled,
-// without needing it disabled), and the point-12 ones (does non-matching
-// material really pass through cleanly on both a horizontal belt line and a
-// vertical launcher column, and does matching material still get launched
-// reliably enough in practice) - none of that is something static analysis
-// alone can fully settle, and point 12 in particular has already gone
-// through one real-play-driven redesign and one real-play-driven reversion,
-// so it remains the part of this mod most worth testing thoroughly rather
-// than trusting on the strength of the reasoning alone.
+// filter check, and one more for point 14's type-scoped movement-
+// authorization fix) all touch undocumented internals the way this pack's
+// grabber-safe-resize/toggle-grab mods already do for similar reasons -
+// each validated with this repo's own validate-mod.js (runs the game's real
+// patch applier against the real installed files and checks the patched
+// result is still syntactically valid JS), but only actually playing
+// confirms the runtime behavior end to end - especially the point-5 patches
+// (does the native filter screen and its on-screen overlay boxes really
+// treat this mod's segments like a vanilla Filter/Advanced Filter), the
+// point-8 ones (does the new tech node actually render, gate correctly, and
+// grant the right unlock on research), the point-9 ones (do liquids/gases
+// really fly out of the Advanced Filtered Launcher now, and do a plain
+// vanilla Launcher/Launcher Mk2 AND the plain Filtered Launcher really
+// still refuse them exactly as before), the point-10 one (does this mod's
+// filter screen now work correctly alongside Solaryum enabled, without
+// needing it disabled), and the point-12/14 ones together (does
+// non-matching material really pass through cleanly on both a gravity-fed
+// column and a belt line, does matching material still get launched
+// reliably enough in practice, AND does a vanilla Filter Wall/Filter Wall
+// Mk2/Critter Fence set to Block still correctly block belt-fed material
+// with this mod installed) - none of that is something static analysis
+// alone can fully settle. This pass-through mechanism has already gone
+// through a real-play-driven redesign and reversion (point 12/13), a
+// removal that fixed a vanilla regression but broke this mod's own belt
+// behavior in the process (point 13), and a type-scoped rewrite meant to
+// finally get both right at once (point 14) - so it remains, by a wide
+// margin, the part of this mod most worth testing thoroughly rather than
+// trusting on the strength of the reasoning alone.
 
 const api = sandkit.api;
 

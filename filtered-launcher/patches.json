@@ -88,11 +88,11 @@
 		"expectedMatches": 1
 	},
 	{
-		"id": "movement-authorization-check-honors-filter-pass-through-when-rejected",
+		"id": "movement-authorization-check-honors-filter-pass-through-when-rejected-for-this-mods-launchers-only",
 		"file": "js/simulation-worker.js",
 		"find": "(0===A.mode?k:!k)||(3&m)===a.TILE_MODE_FILTERED&&(m>>8&255)===S?w?u:d:p}",
 		"operation": "replace",
-		"code": "(0===A.mode?k:!k)||(3&m)===a.TILE_MODE_FILTERED&&(m>>8&255)===S?w?u:d:w?u:p}",
+		"code": "(0===A.mode?k:!k)||(3&m)===a.TILE_MODE_FILTERED&&(m>>8&255)===S?w?u:d:(w&&[\"shanderFilteredLauncherUp\",\"shanderFilteredLauncherLeft\",\"shanderFilteredLauncherRight\",\"shanderAdvancedFilteredLauncherUp\",\"shanderAdvancedFilteredLauncherLeft\",\"shanderAdvancedFilteredLauncherRight\"].includes((0,a.getTypeFromIndex)(v))?u:p)}",
 		"expectedMatches": 1
 	}
 ]
