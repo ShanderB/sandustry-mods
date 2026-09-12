@@ -2,33 +2,33 @@
 	{
 		"id": "recognize-filtered-launcher-for-filter-config-panel",
 		"file": "js/bundle.js",
-		"find": "mk=[\"filterWall\",\"filterWallMk2\"]",
+		"find": "mk=[\"filterWall\",\"filterWallMk2\"",
 		"operation": "replace",
-		"code": "mk=[\"filterWall\",\"filterWallMk2\",\"shanderFilteredLauncherUp\",\"shanderFilteredLauncherLeft\",\"shanderFilteredLauncherRight\",\"shanderAdvancedFilteredLauncherUp\",\"shanderAdvancedFilteredLauncherLeft\",\"shanderAdvancedFilteredLauncherRight\"]",
+		"code": "mk=[\"filterWall\",\"filterWallMk2\",\"shanderFilteredLauncherUp\",\"shanderFilteredLauncherLeft\",\"shanderFilteredLauncherRight\",\"shanderAdvancedFilteredLauncherUp\",\"shanderAdvancedFilteredLauncherLeft\",\"shanderAdvancedFilteredLauncherRight\"",
 		"expectedMatches": 1
 	},
 	{
 		"id": "activate-filter-config-panel-when-equipping-filtered-launcher",
 		"file": "js/bundle.js",
-		"find": "const m=[r.ev.FilterRight,r.ev.FilterLeft,\"filterRightMk2\",\"filterLeftMk2\"]",
+		"find": "const m=[r.ev.FilterRight,r.ev.FilterLeft,\"filterRightMk2\",\"filterLeftMk2\"",
 		"operation": "replace",
-		"code": "const m=[r.ev.FilterRight,r.ev.FilterLeft,\"filterRightMk2\",\"filterLeftMk2\",\"shanderFilteredLauncherUp\",\"shanderFilteredLauncherLeft\",\"shanderFilteredLauncherRight\",\"shanderAdvancedFilteredLauncherUp\",\"shanderAdvancedFilteredLauncherLeft\",\"shanderAdvancedFilteredLauncherRight\"]",
+		"code": "const m=[r.ev.FilterRight,r.ev.FilterLeft,\"filterRightMk2\",\"filterLeftMk2\",\"shanderFilteredLauncherUp\",\"shanderFilteredLauncherLeft\",\"shanderFilteredLauncherRight\",\"shanderAdvancedFilteredLauncherUp\",\"shanderAdvancedFilteredLauncherLeft\",\"shanderAdvancedFilteredLauncherRight\"",
 		"expectedMatches": 1
 	},
 	{
 		"id": "keep-filtered-launcher-active-after-picking-an-element",
 		"file": "js/bundle.js",
-		"find": "e.session.building.activeStructureType=w?\"filterRightMk2\":N.ev.FilterRight,",
+		"find": "w?\"filterRightMk2\":N.ev.FilterRight",
 		"operation": "replace",
-		"code": "e.session.building.activeStructureType=bk(e.session.building.activeStructureType)?e.session.building.activeStructureType:w?\"filterRightMk2\":N.ev.FilterRight,",
+		"code": "(bk(e.session.building.activeStructureType)?e.session.building.activeStructureType:(w?\"filterRightMk2\":N.ev.FilterRight))",
 		"expectedMatches": 1
 	},
 	{
 		"id": "treat-advanced-filtered-launcher-as-mk2-tier",
 		"file": "js/bundle.js",
-		"find": "Uk=[\"filterLeftMk2\",\"filterRightMk2\",\"filterWallMk2\"]",
+		"find": "Uk=[\"filterLeftMk2\",\"filterRightMk2\",\"filterWallMk2\"",
 		"operation": "replace",
-		"code": "Uk=[\"filterLeftMk2\",\"filterRightMk2\",\"filterWallMk2\",\"shanderAdvancedFilteredLauncherUp\",\"shanderAdvancedFilteredLauncherLeft\",\"shanderAdvancedFilteredLauncherRight\"]",
+		"code": "Uk=[\"filterLeftMk2\",\"filterRightMk2\",\"filterWallMk2\",\"shanderAdvancedFilteredLauncherUp\",\"shanderAdvancedFilteredLauncherLeft\",\"shanderAdvancedFilteredLauncherRight\"",
 		"expectedMatches": 1
 	},
 	{
@@ -50,9 +50,9 @@
 	{
 		"id": "custom-launcher-types-without-a-tick-buffer-use-runLaunchers-gate",
 		"file": "js/simulation-worker.js",
-		"find": "if(y!==r.RJ.Particle)if(T){const t=T.runTickSharedBufferKey;if(!t)return!1;{const n=null===(m=null===(i=e.shared)||void 0===i?void 0:i.mods)||void 0===m?void 0:m[t];if(!n||n[0]!==v.meta.tick)return!1}}else if(!v.machineryEngine.runLaunchers)return!1;",
+		"find": "T.runTickSharedBufferKey;if(!t)return!1;",
 		"operation": "replace",
-		"code": "if(y!==r.RJ.Particle)if(T){const t=T.runTickSharedBufferKey;if(!t){if(!v.machineryEngine.runLaunchers)return!1}else{const n=null===(m=null===(i=e.shared)||void 0===i?void 0:i.mods)||void 0===m?void 0:m[t];if(!n||n[0]!==v.meta.tick)return!1}}else if(!v.machineryEngine.runLaunchers)return!1;",
+		"code": "T.runTickSharedBufferKey;if(!t){if(!v.machineryEngine.runLaunchers)return!1}else",
 		"expectedMatches": 1
 	},
 	{
@@ -80,11 +80,19 @@
 		"expectedMatches": 1
 	},
 	{
-		"id": "restrict-liquid-gas-launching-to-advanced-filtered-launcher-only",
+		"id": "gate-launch-on-tile-filter-match-and-restrict-liquid-gas-to-advanced",
 		"file": "js/simulation-worker.js",
 		"find": "A=d.includes(S),T=A?null:h(e,S);if(!A&&!T)return!1;if((0,s.Y$)(e,x,b),",
 		"operation": "replace",
-		"code": "A=d.includes(S),T=A?null:h(e,S);if(!A&&!T)return!1;if(\"shanderAdvancedFilteredLauncherUp\"!==S&&\"shanderAdvancedFilteredLauncherLeft\"!==S&&\"shanderAdvancedFilteredLauncherRight\"!==S){const shanderMt=(a.m5[y]||{}).matterType;if(shanderMt===r.es.Liquid||shanderMt===r.es.Gas)return!1}if((0,s.Y$)(e,x,b),",
+		"code": "A=d.includes(S),T=A?null:h(e,S);if(!A&&!T)return!1;if(T&&y!==r.RJ.Particle){const shanderTi=l.getTileIndex(x,b),shanderAc=l.getBlockAccess(shanderTi);if((3&shanderAc)===l.TILE_MODE_FILTERED){const shanderCfgId=l.getFilterConfigId(shanderAc);if(shanderCfgId>0){const shanderCfg=l.getFilterConfig(shanderCfgId);if(shanderCfg.hasElementMask()){const shanderIn=shanderCfg.isInElementMask(y),shanderMatch=0===shanderCfg.mode?shanderIn:!shanderIn;if(!shanderMatch)return!1}}}}if(\"shanderAdvancedFilteredLauncherUp\"!==S&&\"shanderAdvancedFilteredLauncherLeft\"!==S&&\"shanderAdvancedFilteredLauncherRight\"!==S){const shanderMt=(a.m5[y]||{}).matterType;if(shanderMt===r.es.Liquid||shanderMt===r.es.Gas)return!1}if((0,s.Y$)(e,x,b),",
+		"expectedMatches": 1
+	},
+	{
+		"id": "movement-authorization-check-honors-filter-pass-through-when-rejected",
+		"file": "js/simulation-worker.js",
+		"find": "(0===A.mode?k:!k)||(3&m)===a.TILE_MODE_FILTERED&&(m>>8&255)===S?w?u:d:p}",
+		"operation": "replace",
+		"code": "(0===A.mode?k:!k)||(3&m)===a.TILE_MODE_FILTERED&&(m>>8&255)===S?w?u:d:w?u:p}",
 		"expectedMatches": 1
 	}
 ]

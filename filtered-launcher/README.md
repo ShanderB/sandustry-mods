@@ -13,8 +13,9 @@ caixinhas clicáveis que um Filter vanilla mostra na tela enquanto você
 tem o item equipado, pra redirecionar essa mesma tela e editar um já
 existente. Passar o mouse por cima mostra "Filter" igual um Filter
 vanilla, e segurando o **Grabber** mostra o resumo Allow/Block ao
-vivo. Só o que estiver liberado chega a ser lançado; o resto fica
-bloqueado, no mesmo tile que faz o lançamento.
+vivo. Só o que estiver liberado é lançado; o resto simplesmente
+**passa direto** pelo tile em vez de ficar bloqueado (ver item #12 —
+não é um Filter tradicional, nunca impede nada de entrar).
 
 - **Filtered Launcher** pareia com o **Filter** comum e lança na
   velocidade do **Launcher** vanilla padrão: um recurso por vez,
@@ -406,47 +407,291 @@ Launcher e Launcher Mk2 vanilla não mudam em nada.
 
 ## Sobre o arrastar escolher a direção
 
-`buildModes` usa só `"line"` (vertical/diagonal) — não os
-`"launcherRectUp"`/`"launcherRectSide"` do Launcher vanilla (a versão
-que planta um bloco retangular largo de uma vez), porque esses dois
-dependem de uma matriz de colisão interna que, diferente das de
-conveyor/splitter/foundation, não é uma das formas que aparecem nos
-dados de forma legíveis do jogo — não deu pra copiar com confiança.
-`"line"` não precisa de matriz nenhuma — confirmado pelo próprio Shaker
-vanilla, que usa `buildModes:[{type:"line",...}]` sem shape própria —
-então arrastar em coluna (o jeito normal de construir um eixo de
-launcher) funciona igual ao vanilla, cada célula arrastada um segmento
-de 1 tile separado; só falta a variante retangular larga.
-
 A troca de tipo durante o arrasto (reto pra cima = Up, pra um canto =
 Left/Right, incluindo em qual canto encaixa) é lógica genérica do
 próprio jogo baseada em `registeredLauncherTypes` — funcionou desde a
 primeira versão sem nenhum código de arrasto próprio.
 
+### 8. Build Modes: faltavam o Rect Up e o Rect Side do Launcher vanilla
+
+`buildModes` só tinha `"line"` (arrastar em coluna/diagonal, um
+segmento de 1 tile por célula). O Launcher vanilla também tem
+`"launcherRectUp"` e `"launcherRectSide"` — arrasta um **retângulo**
+inteiro de uma vez em vez de só uma coluna. Uma versão anterior deste
+README dizia que isso "precisava de uma matriz de colisão (`shape`)
+que não dava pra copiar com confiança" — pedido novo do usuário pra
+adicionar isso me fez ler esse caminho de novo, e essa conclusão
+estava **errada**.
+
+O que descobri de fato: `LauncherUp` até referencia uma chave de shape
+(`_["launcher-up"]`), só que essa chave **não existe** na tabela de
+shapes do jogo — resolve pra `undefined` em tempo de execução. Ou
+seja, o próprio Launcher vanilla também não tem shape nenhuma. Rastreei
+o código de verdade que processa esses dois build modes (a função
+genérica que transforma um arrasto do mouse numa lista de posições +
+tipo de estrutura pra cada uma) e nenhum dos dois depende de `shape`:
+
+- A escolha "retângulo inteiro vs. linha" só olha o próprio array
+  `buildModes` da estrutura — mesmo mecanismo que já fazia `"line"`
+  funcionar.
+- Preencher o retângulo é um fill 2D simples entre o início do arrasto
+  e a posição do mouse, sem shape nenhuma envolvida.
+- Decidir se cada célula do retângulo vira Up, Left ou Right procura o
+  tipo em `session.sandkit.registeredLauncherTypes` — o mesmo registro
+  que o item #1 já usa pra registrar os tipos deste mod — sem nenhum
+  caso especial pra ids vanilla.
+
+Resultado: bastou adicionar `{type:"launcherRectUp"}` e
+`{type:"launcherRectSide"}` no `buildModes` do segmento Up de cada
+família em `main.js`, **sem patch nenhum** (API pública + comportamento
+genérico do próprio jogo) — igual ao Launcher/Launcher Mk2 vanilla,
+arrastar um retângulo agora planta um bloco inteiro de launchers de uma
+vez (linha de cima vira o segmento reto, o resto vira Left/Right
+alimentando ela) ou uma parede inteira de Left/Right de lado.
+
+### 9. Relato real de usuário: a tela de filtro não aparecia (conflito com o Solaryum)
+
+Um usuário baixou o mod, instalou junto com outros 66 mods, e reportou
+que a tela de filtro nunca abria — o Filter vanilla dele funcionava
+normal, só os blocos deste mod que não. Ele rodou o **Mod Inspector**
+(mod de diagnóstico de terceiros) e me mandou a saída — e ela já
+mostrava a causa exata, sem precisar adivinhar:
+
+```
+[patch_apply_failed] shander.filtered-launcher: Patch "recognize-filtered-launcher-for-filter-config-panel" failed (match_count_mismatch)
+[patch_apply_failed] shander.filtered-launcher: Patch "activate-filter-config-panel-when-equipping-filtered-launcher" failed (match_count_mismatch)
+[patch_apply_failed] shander.filtered-launcher: Patch "keep-filtered-launcher-active-after-picking-an-element" failed (match_count_mismatch)
+[patch_apply_failed] shander.filtered-launcher: Patch "treat-advanced-filtered-launcher-as-mk2-tier" failed (match_count_mismatch)
+[patch_apply_failed] shander.filtered-launcher: Patch "custom-launcher-types-without-a-tick-buffer-use-runLaunchers-gate" failed (match_count_mismatch)
+```
+
+5 dos 11 patches — justamente os que fazem o jogo reconhecer os
+blocos deste mod como filtro — falharam com `match_count_mismatch`:
+o texto original que cada patch procurava simplesmente não estava mais
+lá. No mesmo relatório, dois outros mods instalados (**Auto Sorter** e
+**Solaryum**) tinham patches com nomes claramente fazendo a mesma
+coisa — estendendo as mesmas listas nativas de tipos de filtro pros
+próprios blocos deles — e os patches **deles** também estavam
+falhando. Pedi pro usuário testar desativando um mod de cada vez:
+confirmou que era o **Solaryum**.
+
+**Causa raiz:** todo patch afetado aqui originalmente exigia encontrar
+uma linha **inteira e intacta** (um array literal terminando em `]`,
+ou uma expressão completa). Se outro mod mexe nessa mesma linha
+primeiro — mesmo que só pra adicionar o próprio item dele, do mesmo
+jeito que a gente faz — o texto completo que nosso patch procurava
+deixa de existir, e o patch falha, não importa quem "está certo". Não
+é bug de nenhum dos dois mods isoladamente — é o que acontece quando
+vários mods mexem, cada um por conta própria, nas mesmas poucas linhas
+estreitas do vanilla, o que parece acontecer bastante aqui já que só
+existem uns punhados de lugares no jogo inteiro que decidem "isso é um
+tipo de filtro/launcher".
+
+**A correção:** reescrevi os 5 patches afetados pra ancorar só no
+menor pedaço único necessário, e só **adicionar** — nunca mais casar
+com texto que inclui o `]` de fechamento ou o resto de uma expressão
+que outro mod possa já ter estendido antes. Por exemplo, o patch da
+whitelist agora ancora em `mk=["filterWall","filterWallMk2"` (sem o
+`]` de fechamento) em vez do array inteiro
+`mk=["filterWall","filterWallMk2"]` — então não importa se o patch
+deste mod ou o do Solaryum roda primeiro, cada um planta sua adição
+logo depois de `"filterWallMk2"`, e o que o outro adicionou (ou o `]`
+original) simplesmente continua depois, sem ser tocado. A exceção são
+o patch que mantém o bloco equipado ao trocar de elemento e o do
+"tick buffer" do launcher, que mexem numa expressão de controle de
+fluxo em vez de uma lista — esses agora envolvem/trocam só a
+menor sub-expressão original que precisa sobreviver de qualquer jeito,
+então uma correção equivalente de outro mod, mesmo em ordem diferente,
+tem bem menos chance de apagá-la de vez. Isso não garante zero
+conflito com qualquer combinação possível de mods — só tira a
+fragilidade específica (depender de uma linha **inteira** ficar
+intocada) que esse relato real expôs.
+
+### 10. Pedido de um jogador: primeiro recusado, depois implementado (achei a peça que faltava)
+
+Um jogador sugeriu: em vez de bloquear o que não bate no filtro, deixa
+passar tudo, só **lança** o que bate — assim daria pra usar como
+salvaguarda numa esteira com vários materiais, sem travar os que não
+interessam. Levei a sério em vez de descartar de cara (mesma lição do
+item #8 — reconferir em vez de só repetir "não dá").
+
+**Primeira resposta (não implementada ainda):** o item #2 já
+estabelece que filtro e launcher só se combinam *porque* o filtro
+bloqueia a entrada no nível do tile — o launcher em si nunca olha a
+lista do filtro, só lança o que já estiver sentado na célula.
+Desacoplar "pode entrar" de "é lançado" significaria: o elemento que
+não bate entra na célula mas não é lançado — e aí o quê? Conferi a
+configuração de transporte (mesma fonte dos números de velocidade do
+item #1): **Conveyor** tem `maxDisplacementCellsPerPass` (movimento
+passivo de esteira); **Launcher não tem esse campo**. Concluí que sem
+esse campo, o elemento não lançado ficaria **parado dentro do tile
+pra sempre** — pior que hoje. Recomendei não implementar, e documentei
+isso.
+
+**O usuário pediu pra implementar mesmo assim.** Em vez de seguir com
+uma explicação que eu mesmo já tinha marcado como possivelmente
+incompleta, fui reler o código de codificação do filtro no tile (o
+mesmo do item #2) com mais calma — e achei a peça que faltava: **isso
+já existe no jogo, pronto, esperando ser usado.**
+
+O código que grava o `.filter` de uma estrutura nos bits do tile
+também lê `structure.data.filterPassThrough`. Se for `true`, ele liga
+um bit **separado** (`FILTER_PASS_THROUGH_BIT`) junto com os bits do
+filtro. Conferi o lado da leitura também: todo lugar que checa "esse
+tile de filtro está bloqueando movimento" checa esse bit **primeiro**
+e pula o bloqueio inteiro se ele estiver ligado — a configuração do
+filtro continua intacta (a tela nativa continua funcionando igual),
+só o efeito de bloqueio desliga. Não é um hack reconstruído do zero,
+é um campo de verdade que já existe no jogo, só que este mod não
+usava.
+
+Isso sozinho não bastava: o launcher continua sem olhar o filtro pra
+decidir se lança — sem o bloqueio, ele lançaria **qualquer coisa** que
+estivesse na célula, filtrada ou não. Faltava a segunda metade: um
+patch novo que, na hora de decidir se lança, lê os mesmos bits do
+tile e — se estiver em modo filtrado — resolve a config do filtro e
+confere se o elemento atual bate, usando exatamente as mesmas funções
+(`getFilterConfig`/`isInElementMask`) que o próprio código de bloqueio
+do jogo usa (já importadas no mesmo módulo, nenhum import novo
+precisou ser adicionado). Se não bater, ele desiste de lançar sem
+fazer mais nada.
+
+**O buraco da primeira resposta:** sem o bloqueio, um elemento que não
+bate no filtro e que o launcher se recusa a lançar não fica mais
+suspenso artificialmente por nada — a gravidade normal (e o que
+estiver fisicamente embaixo do tile) simplesmente continua agindo,
+igual já acontece entre um tick de lançamento e outro. O "ficaria
+parado pra sempre" da primeira resposta era exatamente a parte que
+não se sustentava.
+
+**Correção seguinte (relato real de novo):** testado numa esteira
+horizontal — esteira → Filtered Launcher → esteira — com um elemento
+que não batia no filtro (Bloom/Gloom). Resultado: ficava travado na
+primeira esteira, não passava pra terceira. O bit de pass-through
+continuava ligado certinho; o que faltava era mais estreito e fácil de
+não perceber: existem **duas** funções separadas no jogo que decidem
+"esse elemento pode se mover pra cá" — não uma só. A mais simples (a
+que já tinha sido conferida, usada pelo movimento genérico por
+gravidade) respeita `isFilterPassThrough` direitinho. Uma segunda
+função, mais completa — a que o transporte de esteira/conveyor
+especificamente consulta pra decidir se um elemento empurrado pode
+continuar pra próxima célula — também consultava o pass-through, mas
+só no ramo em que o elemento **já bate** no filtro (onde não faz
+diferença nenhuma, já que bater já autoriza de qualquer jeito). No
+ramo de **não bater**, ela sempre retornava "não autorizado", ponto
+final, sem nenhum caminho de volta pra checar o pass-through — ou
+seja, qualquer coisa chegando por esteira num tile filtrado-mas-
+passante continuava sendo recusada, exatamente o que foi relatado.
+
+Corrigi o retorno final dessa função pra também checar o pass-through
+no ramo de não-correspondência, não só no de correspondência: antes
+`bate ? (autorizado de um jeito ou de outro) : recusado`, agora
+`bate ? (autorizado de um jeito ou de outro) : (pass-through ?
+autorizado : recusado)` — mudança puramente aditiva, só muda o
+resultado pra exata combinação que os blocos deste mod criam (filtro
+com pass-through ligado **e** elemento que não bate) — nada mais no
+jogo instalado hoje liga pass-through num filtro com lista não-vazia,
+então não deveria mudar comportamento de mais nada.
+
+**Aviso de honestidade:** essa segunda função é usada bem além de
+esteiras (o mesmo módulo também controla zonas de restrição de
+jetpack/build/grab/ferramenta), então esse é o patch de maior alcance
+deste mod inteiro, mesmo a mudança em si sendo de duas palavras.
+Conferi que as duas combinações relevantes (pass-through + filtro
+vazio, pass-through + filtro não-vazio) não são usadas por mais nada
+no jogo instalado antes de aplicar.
+
+### 11. Item bom escapava numa esteira rápida — tentei uma correção, o jogador não gostou, revertido
+
+Testando de novo: numa esteira, um item que **batia** no filtro (devia
+ser lançado) às vezes simplesmente atravessava o launcher e chegava do
+outro lado sem ser lançado — a menos que vários Filtered Launchers
+fossem colocados em fileira. Causa: o launcher só realmente tenta
+lançar numa cadência periódica (~683ms, a mesma do Launcher padrão
+vanilla — item #6). Sem bloqueio nenhum (pass-through ligado pra tudo,
+item bom incluso), uma esteira rápida (332ms por passo no MK1, menos
+ainda no MK2) conseguia empurrar o item bom pra fora do tile **antes**
+do próximo pulso do launcher ter chance de vê-lo. Antes do item #10
+(quando ainda bloqueava tudo que não batia), esse problema não
+existia — o item bom, uma vez dentro da célula, não tinha pra onde ir;
+ficava esperando o próximo pulso. O pass-through tirou esse "segurar"
+de todo mundo, inclusive do item que devia ser segurado.
+
+**Tentativa de correção (revertida):** cheguei a trocar a abordagem
+inteira — em vez de pass-through, inverter o **modo** do filtro só na
+hora de codificar o bloqueio do tile (Allow vira Block com a mesma
+lista, só na gravação, mantendo a tela nativa e o `.filter` de verdade
+intocados), fazendo a lógica de bloqueio padrão do jogo segurar o
+recurso desejado no lugar do indesejado. Isso fechava a brecha de
+tempo pela raiz, e até permitia remover os dois patches do item #12
+(a checagem de filtro no launcher e o patch de autorização de
+movimento). **Só que, testado de verdade, o resultado ficou pior na
+prática** do que o pequeno risco de escapar ocasionalmente numa
+esteira muito rápida — revertido a pedido direto do usuário
+("Ficou péssimo. Deixe do jeito que estava."), sem investigar mais a
+fundo o motivo exato, já que o pedido foi claro. Registro aqui porque
+é assim que a decisão de verdade foi tomada — inclusive o caminho que
+não deu certo.
+
+**O que fica valendo:** o design do item #10 (pass-through +
+correção da função de autorização de movimento), com a limitação de
+timing do parágrafo acima **aceita como conhecida**, não corrigida —
+o pior caso é ocasionalmente um item bom escapar numa esteira muito
+rápida, mitigável colocando mais de um Filtered Launcher em sequência
+se isso incomodar. Prefiro essa limitação pequena e conhecida a uma
+mudança que piorou a experiência real de jogo.
+
+**Ponto separado, sem relação, relatado ao mesmo tempo:** se uma
+camada de material indesejado está **em cima** do material desejado
+numa pilha, o launcher não consegue "pegar" o que está embaixo, porque
+esse material nunca chega a alcançar o tile pra ser avaliado. Isso não
+é um bug deste mod — um Filter vanilla tem exatamente a mesma
+limitação, já que nenhum dos dois consegue "enxergar" ou reorganizar
+uma pilha por fora dela; é assim que a física do jogo funciona pra
+qualquer estrutura desse tipo. Não é algo que dá pra corrigir só
+mexendo nos blocos deste mod.
+
 ## Ponto de honestidade
 
 Tudo acima foi confirmado lendo o próprio código do jogo e, pros itens
-3, 4, 5, 6 e 7 da lista de bugs, testando de fato versões anteriores no
-jogo e rastreando a causa real de cada relato. `structures.register` /
-`structureBehaviors.registerLauncherType` / `structures.getAtCell` /
-`structures.update` / `tech.addDefinition` são chamadas públicas reais
-e atuais do Sandkit. Os onze patches em `patches.json` (quatro do item
-#3/#5, dois do item #6, um do item #4, quatro do item #7) mexem em
-território não documentado, do mesmo jeito que
+3, 4, 5, 6, 7, 8, 9, 10 e 11 da lista de bugs, testando de fato
+versões anteriores no jogo e rastreando a causa real de cada relato.
+`structures.register` / `structureBehaviors.registerLauncherType` /
+`structures.getAtCell` / `structures.update` / `tech.addDefinition` são
+chamadas públicas reais e atuais do Sandkit. Os **doze** patches em
+`patches.json` (quatro do item #3/#5, dois do item #6, um do item #4,
+quatro do item #7 — um deles reescrito pelo item #9 pra ficar
+resistente a ordem — um do item #10 para a checagem de filtro no
+launcher, e um mais pro patch de autorização de movimento do item #10)
+mexem em território não documentado, do mesmo jeito que
 `grabber-safe-resize`/`toggle-grab` deste pacote já fazem por motivos
-parecidos — cada um validado com o `validate-mod.js` deste
-repositório (que roda o aplicador de patch de verdade do próprio jogo
-contra os arquivos instalados de verdade, e confere que o resultado
-remendado ainda é JavaScript sintaticamente válido), mas só jogar de
-fato confirma o comportamento em tempo de execução ponta a ponta —
-principalmente os do item #3/#5 ("a tela nativa, as caixinhas
-clicáveis, a escolha de elemento e o modo avançado tratam este mod
-igual a um Filter/Advanced Filter vanilla"), os do item #6 ("a tech
-nova aparece, trava/libera certo, e realmente desbloqueia o bloco ao
-pesquisar") e os do item #7 ("líquido/gás realmente sai voando só do
-Advanced Filtered Launcher, e o Launcher/Launcher Mk2 vanilla e o
-Filtered Launcher comum continuam recusando exatamente como antes") —
-nenhum dos três é algo que dá pra confirmar 100% só lendo código.
+parecidos. O item #11 registra uma tentativa de simplificar esse
+mesmo conjunto de patches (reduzindo pra onze) que foi testada,
+piorou a experiência real e foi revertida — o histórico de ambas as
+versões fica registrado acima porque é assim que a decisão de verdade
+foi tomada, mesmo o resultado final sendo o design "antigo". Cada
+patch é validado com o `validate-mod.js` deste repositório (que roda o
+aplicador de patch de verdade do próprio jogo contra os arquivos
+instalados de verdade, e confere que o resultado remendado ainda é
+JavaScript sintaticamente válido), mas só jogar de fato confirma o
+comportamento em tempo de execução ponta a ponta — principalmente os
+do item #3/#5 ("a tela nativa, as caixinhas clicáveis, a escolha de
+elemento e o modo avançado tratam este mod igual a um Filter/Advanced
+Filter vanilla"), os do item #6 ("a tech nova aparece, trava/libera
+certo, e realmente desbloqueia o bloco ao pesquisar"), os do item #7
+("líquido/gás realmente sai voando só do Advanced Filtered Launcher, e
+o Launcher/Launcher Mk2 vanilla e o Filtered Launcher comum continuam
+recusando exatamente como antes"), o do item #8 ("arrastar um
+retângulo realmente planta um bloco inteiro de launchers, com Up em
+cima e Left/Right alimentando, ou uma parede inteira de lado"), o do
+item #9 (a tela de filtro funciona mesmo com Solaryum ativado) e os do
+item #10 ("material que não bate no filtro passa pelo tile livremente,
+e o que bate ainda é lançado corretamente na maior parte do tempo,
+com a limitação de timing conhecida do item #11 em esteiras muito
+rápidas") — nenhum desses é algo que dá pra confirmar 100% só lendo
+código, e esse mecanismo em particular já passou por uma rodada de
+redesenho e reversão via teste real, então continua sendo a parte
+deste mod que mais merece atenção antes de confiar cegamente.
 
 **Testa isso:**
 
@@ -491,14 +736,60 @@ nenhum dos três é algo que dá pra confirmar 100% só lendo código.
    recusando, exatamente como sempre se comportou. Se qualquer um dos
    dois passar a lançar, o quinto patch do item #7 (o guard) não está
    restringindo direito.
+10. Equipa qualquer um dos dois blocos e, em vez de arrastar em coluna,
+    **arrasta um retângulo** (segura e puxa o mouse na diagonal) —
+    confirma que aparecem os modos Rect Up/Rect Side (mesmo atalho de
+    teclado que troca de modo no Launcher vanilla) e que um bloco
+    inteiro é plantado de uma vez: Rect Up bota o segmento reto na
+    fileira de cima e Left/Right alimentando embaixo; Rect Side planta
+    uma parede inteira de Left ou Right.
+11. Se tiver o **Solaryum** (ou o **Auto Sorter**) instalado junto:
+    repete os passos 3-4 (tela de filtro nativa abrindo ao equipar) com
+    ele ativado. Isso é o que estava quebrado no relato real que gerou
+    o item #9 — confirma que voltou a funcionar mesmo com um desses
+    dois mods ligados, sem precisar desativar nada.
+12. Configura o filtro pra permitir só um recurso (ex: Gold) e joga
+    **outra coisa** nele (ex: Sand) — confirma que o Sand **não** é
+    bloqueado na frente do bloco: ele deve continuar se
+    movendo/caindo através do tile normalmente, sem ser lançado. Joga
+    Gold em seguida e confirma que esse sim é lançado. Testa também no
+    **Filtered Launcher comum** com `affectsLiquidsAndGases` ligado e
+    um líquido/gás não incluído no filtro: deve passar pelo tile sem
+    ser bloqueado nem lançado (só o Advanced lança líquido/gás, item
+    #7).
+13. Monta uma linha **esteira → Filtered Launcher → esteira**
+    (horizontal, três tiles). Manda um material que **não bate** no
+    filtro pela esteira 1 — confirma que ele atravessa o launcher e
+    chega na esteira 3 em vez de ficar travado na esteira 1. Depois
+    manda vários materiais que **batem** no filtro pela mesma esteira
+    numa esteira MK1 (não precisa ser MK2) — confirma que a maioria é
+    lançada corretamente; um escape ocasional é a limitação **conhecida
+    e aceita** do item #11 (mitigável colocando mais de um Filtered
+    Launcher em fileira), não um patch quebrado. Testa também numa
+    coluna vertical de launchers empilhados.
+14. Coloca uma camada de material que não bate no filtro **em cima**
+    de material que bate, numa pilha, alimentando o Filtered Launcher
+    por baixo — confirma que o launcher realmente não consegue pegar o
+    material enterrado (comportamento esperado, igual um Filter
+    vanilla faria - ver item #11) e não é um sinal de que algo quebrou.
 
 Se os passos 1-2 não aparecerem certos, os patches do item #6 precisam
-de outro olhar; se os passos 3-5 falharem, é o item #3/#5; se o passo
+de outro olhar; se os passos 3-5 falharem, é o item #3/#5 (e, se só
+falhar com Solaryum/Auto Sorter ativado, é o item #9); se o passo
 7 não lançar nada mesmo liberado, é o patch do item #4; se o passo 8
 não lançar líquido/gás no Advanced, é o item #7 (patches de
 Liquid/Gas); se o passo 9 mostrar o Filtered Launcher comum ou o
 Launcher vanilla lançando líquido/gás, é o guard do item #7 que
-precisa de outro olhar.
+precisa de outro olhar; se o passo 10 não mostrar os modos Rect
+Up/Rect Side ou plantar errado, é o `buildModes` do item #8; se o
+passo 11 falhar, os patches reescritos do item #9 ainda não bastam
+pra esse combo de mods específico; se o passo 12 mostrar o que não
+bate no filtro sendo bloqueado (em vez de passar) ou o que bate nunca
+sendo lançado, os patches do item #10 precisam de outro olhar; se o
+passo 13 mostrar material bom escapando **com muita frequência** (não
+só ocasionalmente numa esteira bem rápida), é sinal de que algo além
+da limitação conhecida do item #11 está errado; o passo 14 é esperado
+sempre dar esse resultado (ver item #11) — não é um patch quebrado.
 
 ## Publicar no Steam Workshop
 

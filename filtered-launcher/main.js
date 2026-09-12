@@ -244,17 +244,29 @@
 //    names. That part worked correctly from the first version once all
 //    three types were declared in registerLauncherType.
 //
-// buildModes only uses "line" (vertical/diagonal), not the vanilla
-// Launcher's extra "launcherRectUp"/"launcherRectSide" multi-column modes -
-// those two need an internal per-cell collision "shape" matrix
-// (`launcher-up`/`launcher-left`/`launcher-right`) that, unlike the
-// conveyor/splitter/foundation ones, is not one of the shapes shipped in the
-// game's own readable shape data, so it could not be copied confidently.
-// "line" placement doesn't need a shape at all - confirmed by the vanilla
-// Shaker, which uses buildModes:[{type:"line",...}] with no shape entry of
-// its own - so a single-column drag (the normal way to build a launcher
-// shaft) works the same as vanilla, each dragged cell a separate 1-tile
-// segment; only the wide rectangular block-placement variant is missing.
+// buildModes originally only used "line" (vertical/diagonal) - an earlier
+// version of this note claimed the vanilla Launcher's extra
+// "launcherRectUp"/"launcherRectSide" modes (drag a whole rectangular block
+// of launchers at once) needed a per-cell collision "shape" matrix that
+// wasn't readable, so they were left out. That was wrong: LauncherUp's own
+// registration does reference a shape key (`_["launcher-up"]`), but that key
+// simply doesn't exist in the game's shapes table - it resolves to
+// `undefined` at runtime, meaning the real Launcher has no shape matrix
+// either. Tracing the actual placement code for these two modes (the
+// generic building-tool function that turns a drag into a list of
+// positions + structure types) shows neither depends on `shape` at all:
+// the rectangle-vs-line choice is generic (reads the structure's own
+// `buildModes` array, same mechanism "line" already used), rectangle-fill
+// is a plain 2D fill between drag start and cursor, and the per-cell
+// Up-vs-Left-vs-Right assignment inside that rectangle is done by looking
+// the placed type up in `session.sandkit.registeredLauncherTypes` -
+// exactly the same registry point 1's registerLauncherType call already
+// puts this mod's types into, with no vanilla-only special-casing anywhere
+// in that lookup. So both modes were just added to buildModes below,
+// unpatched, and work the same way vanilla's do: drag a rectangle instead
+// of a single column, and get a whole block of the Up segment on top with
+// Left/Right feeder segments underneath (rectUp), or a whole sideways wall
+// of Left/Right segments (rectSide).
 //
 // 8. Both buildables were alwaysUnlocked from day one - available from the
 //    start, with no research tie-in. Making them appear in the Research
@@ -342,27 +354,175 @@
 //    at all), asked for explicitly after the first version of this made
 //    both blocks able to launch them.
 //
+// 10. BUG (real user report, real fix): a player with 66 other mods
+//     installed reported the native filter screen never opening at all -
+//     their vanilla Filter worked fine, only this mod's blocks didn't. Their
+//     own Mod Inspector output (a third-party diagnostics mod) showed the
+//     exact cause directly: 5 of this mod's patches failed with
+//     "match_count_mismatch" - the literal vanilla text each one searched
+//     for wasn't there anymore by the time this mod's turn came. Two other
+//     installed mods (a "Sorter" and "Solaryum") had patches with names
+//     unmistakably doing the same kind of thing this mod does - extending
+//     the same handful of native filter whitelist arrays for their own
+//     custom blocks - and their patches were failing too. The player
+//     confirmed by disabling mods one at a time: Solaryum was the one
+//     colliding with this one.
+//
+//     Root cause: every affected patch here originally matched a *complete*
+//     original line (a whole array literal ending in `]`, or a whole
+//     assignment). If another mod patches that same line first - even just
+//     to append its own item the same way this mod does - the full original
+//     text this mod's patch is looking for no longer exists, so it fails,
+//     regardless of which mod is "right." This isn't a bug in either mod
+//     individually - it's what happens when multiple mods independently
+//     text-patch the same few narrow vanilla lines, which several apparently
+//     do because there are only a handful of places in the whole game that
+//     gate "is this a filter/launcher type."
+//
+//     Fix: every one of these patches was rewritten to match only the
+//     smallest unique fragment that has to exist for this mod to work, and
+//     to only ever *append* - never re-match text that includes the closing
+//     `]` or the rest of a statement another mod might have already
+//     extended first. E.g. the whitelist patches now match
+//     `mk=["filterWall","filterWallMk2"` (no closing bracket) instead of the
+//     full `mk=["filterWall","filterWallMk2"]` - so whether this mod's patch
+//     or Solaryum's runs first, each one's own addition lands right after
+//     "filterWallMk2" and whatever the other one added (or the original `]`)
+//     simply continues to follow, undisturbed. The one exception is the
+//     "keep this mod's block equipped after picking an element" patch and
+//     the tick-buffer-gate patch, which change a control-flow expression,
+//     not append to a list - those now wrap/replace only the smallest
+//     original sub-expression that must survive either way, so a
+//     differently-ordered but same-shaped fix from another mod is much less
+//     likely to remove it entirely. None of this can guarantee zero
+//     conflicts with every possible mod combination - it only removes the
+//     specific fragility (depending on an *entire* line staying untouched)
+//     that this real report exposed.
+//
+// 11. Feature request (first reaction: declined - turned out incomplete):
+//     a player suggested letting non-matching material pass straight
+//     through instead of being blocked, only actually launching whatever
+//     matches the filter - so it could double as a safeguard on a belt
+//     carrying several materials, without jamming the ones it doesn't care
+//     about. Looked at this seriously instead of dismissing it, since
+//     that's exactly the kind of assumption worth re-checking (see point
+//     10's own origin). First conclusion: it doesn't fit, based on
+//     reasoning that turned out to be missing a piece - see point 12.
+//
+//     Point 2 above already established filtering and launching are only
+//     combinable *because* the filter blocks entry at the tile level - the
+//     launcher itself never looks at the filter list, it just launches
+//     whatever solid/liquid/gas happens to already be sitting in the cell
+//     (guaranteed to be something the filter allowed, precisely because
+//     non-matches never got in). Decoupling "may enter" from "gets
+//     launched" the way this request wants would mean a non-matching
+//     element *does* enter the tile but doesn't get thrown - and then what?
+//     Checked the game's own transport config (the same JSON point 1's
+//     velocity numbers came from): Conveyor entries carry a
+//     `maxDisplacementCellsPerPass` field - that's the generic per-tick
+//     "push sideways" behavior a belt has even when nothing else is acting
+//     on it. Launcher entries have no such field, which was read at the
+//     time as "a Launcher tile has no passive movement of its own, so a
+//     non-matching element let through would just sit there" - true as far
+//     as it goes, but incomplete: it ignored that gravity keeps acting on
+//     every element regardless of what structure occupies its tile. See
+//     point 12 for what actually happens once tried.
+//
+// 12. The player weighed point 11's explanation and asked to implement it
+//     anyway. Rather than proceed on an explanation already flagged as
+//     possibly incomplete, re-read the tile-filter-encoding code from point
+//     2 again first - and found a real, existing, purpose-built vanilla
+//     mechanism for exactly this: the same encode step also reads
+//     `structure.data.filterPassThrough` and, if true, sets a separate bit
+//     (FILTER_PASS_THROUGH_BIT) that every blocking check consults *first*,
+//     skipping enforcement entirely while leaving the filter's own config
+//     (and the native UI reading it) untouched. Set via `structure.data`
+//     (ensureFilters() below, retrofitted onto older placements too), plus a
+//     patch making the launcher itself (which never looked at the filter
+//     before - point 11) check the tile's filter config before launching, so
+//     it wouldn't launch everything indiscriminately now that nothing
+//     blocked entry. Point 11's "it would sit there forever" turned out
+//     wrong for the reason expected - gravity keeps acting on unsupported
+//     elements regardless of what's on their tile.
+//
+//     That stopping-blocking-at-the-tile-level part still wasn't enough on
+//     its own: a *second*, more complete movement-authorization function -
+//     the one belt/conveyor-driven transport specifically calls through -
+//     turned out to only honor this same pass-through bit on the branch
+//     where an element already matches the filter (where it made no
+//     difference, since a match was already authorized anyway); on the
+//     non-matching branch it always returned "not authorized" outright, so
+//     anything arriving by belt at a pass-through tile still got rejected.
+//     One more patch made that function's rejection branch check
+//     pass-through too, closing that gap - confirmed against every call
+//     site of that function to make sure no other installed content
+//     exercises pass-through-plus-non-empty-filter and would be affected by
+//     the change.
+//
+//     A different approach - inverting the filter's *mode* only for the
+//     tile-encode step (so vanilla's own block-mode logic holds the wanted
+//     resource in place instead of using pass-through at all) - was tried
+//     next specifically to close a timing gap in this design (see the
+//     paragraph below), and did close it, but made real, hands-on play feel
+//     substantially worse overall - reported directly, not something static
+//     reading flagged - so it was reverted at the player's request rather
+//     than kept. The pass-through-based design in this point remains the
+//     one this mod actually ships.
+//
+//     Known, accepted limitation of the shipped design: the launcher only
+//     actually fires on a periodic cadence (the same ~683ms "standard" pass
+//     vanilla's own non-Mk2 Launcher uses - point 6). Because pass-through
+//     means nothing holds a *matching* element in place either, a fast belt
+//     (as little as 332ms per step for a plain Conveyor, faster for Mk2) can
+//     occasionally push a matching element across the tile and gone again
+//     before the next launch pulse gets a chance to check it - worse on very
+//     fast belts, and mitigated in practice by chaining more than one
+//     Filtered Launcher in a row along a fast line. This is a real,
+//     confirmed trade-off of this design, not a misunderstanding - it's
+//     being kept anyway because the alternative tried above worked out
+//     worse in actual play.
+//
+//     Separate, unrelated limitation, also reported directly: a layer of
+//     unwanted material sitting *on top of* wanted material in a pile keeps
+//     the wanted material from ever being launched, because it never
+//     reaches the tile to be evaluated at all. Not a bug introduced by this
+//     mod - a vanilla Filter has the identical limitation, since neither one
+//     can reach through what's physically on top of what they're being fed;
+//     nothing in vanilla can "see" or reorder a pile from outside it. Not
+//     something a patch to this mod's own blocks can fix.
+//
 // HONESTY NOTE: everything above was verified by reading the game's own
 // code and, for points 3-6, by actually testing earlier versions in-game
 // and tracing the real cause of each reported bug. structures.register /
 // structureBehaviors.registerLauncherType / structures.getAtCell /
 // structures.update / api.tech.addDefinition are all real, current, public
 // Sandkit API calls (checked against the currently-installed version). The
-// eleven patches in patches.json (four for point 5, two for point 8, one
-// for point 6, four for point 9) all touch undocumented internals the way
+// twelve patches in patches.json (four for point 5, two for point 8, one
+// for point 6, four for point 9 - point 10 rewrote several of the
+// point-5/6/9 ones to be order-resilient, one for point 12's launcher-side
+// filter check, and one more for point 12's follow-up fix to the shared
+// movement-authorization function) all touch undocumented internals the way
 // this pack's grabber-safe-resize/toggle-grab mods already do for similar
 // reasons - each validated with this repo's own validate-mod.js (runs the
-// game's real patch applier against the real installed files and checks
-// the patched result is still syntactically valid JS), but only actually
-// playing confirms the runtime behavior end to end - especially the
-// point-5 patches (does the native filter screen and its on-screen overlay
-// boxes really treat this mod's segments like a vanilla Filter/Advanced
-// Filter), the point-8 ones (does the new tech node actually render, gate
-// correctly, and grant the right unlock on research), and the point-9 ones
-// (do liquids/gases really fly out of the Advanced Filtered Launcher now,
-// and do a plain vanilla Launcher/Launcher Mk2 AND the plain Filtered
-// Launcher really still refuse them exactly as before) - none of that is
-// something static analysis alone can fully settle.
+// game's real patch applier against the real installed files and checks the
+// patched result is still syntactically valid JS), but only actually
+// playing confirms the runtime behavior end to end - especially the point-5
+// patches (does the native filter screen and its on-screen overlay boxes
+// really treat this mod's segments like a vanilla Filter/Advanced Filter),
+// the point-8 ones (does the new tech node actually render, gate correctly,
+// and grant the right unlock on research), the point-9 ones (do
+// liquids/gases really fly out of the Advanced Filtered Launcher now, and
+// do a plain vanilla Launcher/Launcher Mk2 AND the plain Filtered Launcher
+// really still refuse them exactly as before), the point-10 one (does this
+// mod's filter screen now work correctly alongside Solaryum enabled,
+// without needing it disabled), and the point-12 ones (does non-matching
+// material really pass through cleanly on both a horizontal belt line and a
+// vertical launcher column, and does matching material still get launched
+// reliably enough in practice) - none of that is something static analysis
+// alone can fully settle, and point 12 in particular has already gone
+// through one real-play-driven redesign and one real-play-driven reversion,
+// so it remains the part of this mod most worth testing thoroughly rather
+// than trusting on the strength of the reasoning alone.
 
 const api = sandkit.api;
 
@@ -424,7 +584,7 @@ const FAMILIES = [
 		key: "filteredLauncher",
 		name: "Filtered Launcher",
 		description:
-			"Throws material like a Launcher, at the same speed - but only material this segment's own filter allows through. Equip it like a Filter to configure the Allow/Block list. Only solid/physical material is ever thrown, same as a vanilla Launcher - liquids/gases can be allowed or blocked by the filter, but only the Advanced Filtered Launcher actually launches them.",
+			"Throws material like a Launcher, at the same speed - but only launches material this segment's own filter allows. Everything else simply passes through instead of being blocked. Equip it like a Filter to configure the Allow/Block list. Only solid/physical material is ever thrown, same as a vanilla Launcher - liquids/gases can be allowed or blocked by the filter, but only the Advanced Filtered Launcher actually launches them.",
 		techDescription:
 			"Unlocks the Filtered Launcher, which works like a Launcher but only throws whatever element its own filter currently allows through.",
 		advanced: false,
@@ -435,7 +595,7 @@ const FAMILIES = [
 		key: "advancedFilteredLauncher",
 		name: "Advanced Filtered Launcher",
 		description:
-			"Throws material like a Launcher Mk2, at the same (faster) speed - but only material this segment's own filter allows through. Equip it like an Advanced Filter to configure multiple allowed resources at once. Unlike a vanilla Launcher (and unlike the plain Filtered Launcher), this one also throws liquids and gases if the filter allows them.",
+			"Throws material like a Launcher Mk2, at the same (faster) speed - but only launches material this segment's own filter allows. Everything else simply passes through instead of being blocked. Equip it like an Advanced Filter to configure multiple allowed resources at once. Unlike a vanilla Launcher (and unlike the plain Filtered Launcher), this one also throws liquids and gases if the filter allows them.",
 		techDescription:
 			"Unlocks the Advanced Filtered Launcher, a Launcher Mk2 that only throws whatever elements its own filter allows through - configure multiple at once, including liquids and gases, like the Advanced Filter.",
 		advanced: true,
@@ -469,7 +629,11 @@ for (const family of FAMILIES) {
 			family,
 			spriteFile: `${family.key}Up.png`,
 			size: { width: CELL, height: CELL },
-			buildModes: [{ type: "line", directions: ["vertical", "diagonal"] }],
+			buildModes: [
+				{ type: "line", directions: ["vertical", "diagonal"] },
+				{ type: "launcherRectUp" },
+				{ type: "launcherRectSide" },
+			],
 			primary: true,
 		},
 		{ id: family.leftId, family, spriteFile: `${family.key}Left.png`, size: { width: CELL, height: 23 } },
@@ -568,15 +732,26 @@ function defaultFilterFor(advanced) {
 // filter and pushes it through structures.update() so the game encodes it
 // into the tile the same way it would for a vanilla Filter placement, and
 // so the native filter screen (see point 5 above) has something sensible to
-// show/edit immediately. Cheap for every already-configured block - just
-// one property read each.
+// show/edit immediately. Also makes sure `data.filterPassThrough` is set -
+// see point 12 below for what that field actually does and why it's set
+// here (not just in registerStructure's defaultData) so it also reaches
+// segments placed by an earlier version of this mod, before this field
+// existed, on an existing save. Cheap for every already-configured block -
+// just two property reads each.
 function ensureFilters() {
 	for (const def of STRUCTURES) {
 		safe(() =>
 			api.structures.forEachOfType(def.id, (structure) => {
-				if (structure.filter) return;
-				structure.filter = defaultFilterFor(def.family.advanced);
-				safe(() => api.structures.update(structure, { propagateToWorkers: true }));
+				let changed = false;
+				if (!structure.filter) {
+					structure.filter = defaultFilterFor(def.family.advanced);
+					changed = true;
+				}
+				if (!structure.data || structure.data.filterPassThrough !== true) {
+					structure.data = Object.assign({}, structure.data, { filterPassThrough: true });
+					changed = true;
+				}
+				if (changed) safe(() => api.structures.update(structure, { propagateToWorkers: true }));
 			}),
 		);
 	}
