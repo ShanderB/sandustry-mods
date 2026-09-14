@@ -84,7 +84,7 @@
 		"file": "js/simulation-worker.js",
 		"find": "A=d.includes(S),T=A?null:h(e,S);if(!A&&!T)return!1;if((0,s.Y$)(e,x,b),",
 		"operation": "replace",
-		"code": "A=d.includes(S),T=A?null:h(e,S);if(!A&&!T)return!1;if(T&&y!==r.RJ.Particle){const shanderTi=l.getTileIndex(x,b),shanderAc=l.getBlockAccess(shanderTi);if((3&shanderAc)===l.TILE_MODE_FILTERED){const shanderCfgId=l.getFilterConfigId(shanderAc);if(shanderCfgId>0){const shanderCfg=l.getFilterConfig(shanderCfgId);if(shanderCfg.hasElementMask()){const shanderIn=shanderCfg.isInElementMask(y),shanderMatch=0===shanderCfg.mode?shanderIn:!shanderIn;if(!shanderMatch)return!1}}}}if(\"shanderAdvancedFilteredLauncherUp\"!==S&&\"shanderAdvancedFilteredLauncherLeft\"!==S&&\"shanderAdvancedFilteredLauncherRight\"!==S){const shanderMt=(a.m5[y]||{}).matterType;if(shanderMt===r.es.Liquid||shanderMt===r.es.Gas)return!1}if((0,s.Y$)(e,x,b),",
+		"code": "A=d.includes(S),T=A?null:h(e,S);if(!A&&!T)return!1;const shanderRealType=y===r.RJ.Particle&&g.linkedElementIndex[t]>0?g.type[g.linkedElementIndex[t]]:y;if(T){const shanderTi=l.getTileIndex(x,b),shanderAc=l.getBlockAccess(shanderTi);if((3&shanderAc)===l.TILE_MODE_FILTERED){const shanderCfgId=l.getFilterConfigId(shanderAc);if(shanderCfgId>0){const shanderCfg=l.getFilterConfig(shanderCfgId);if(shanderCfg.hasElementMask()){const shanderIn=shanderCfg.isInElementMask(shanderRealType),shanderMatch=0===shanderCfg.mode?shanderIn:!shanderIn;if(!shanderMatch)return!1}}}}if(\"shanderAdvancedFilteredLauncherUp\"!==S&&\"shanderAdvancedFilteredLauncherLeft\"!==S&&\"shanderAdvancedFilteredLauncherRight\"!==S){const shanderMt=(a.m5[shanderRealType]||{}).matterType;if(shanderMt===r.es.Liquid||shanderMt===r.es.Gas)return!1}if((0,s.Y$)(e,x,b),",
 		"expectedMatches": 1
 	},
 	{

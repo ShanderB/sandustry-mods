@@ -569,6 +569,76 @@
 //     place; point 13's full removal is kept in the history above as the
 //     (overcorrected) intermediate step, not as the final design.
 //
+// 15. BUG (real user report, real fix): a player found that a normal
+//     vanilla Launcher throwing material directly at one of this mod's
+//     blocks got that material relaunched immediately, ignoring the
+//     filter entirely - confirmed as different from just placing the same
+//     material on top by hand (which correctly does *not* get launched).
+//     So the bug was specific to material arriving already in flight.
+//
+//     Traced to point 12's own launcher-side filter-match patch
+//     (gate-launch-on-tile-filter-match...): it wraps the actual filter
+//     check in `if(T&&y!==r.RJ.Particle){...}`, mirroring a condition the
+//     surrounding vanilla code already uses one statement later, for a
+//     different reason - a flying particle's element index has its type
+//     genuinely replaced with the generic `RJ.Particle` marker while
+//     airborne (confirmed by finding the same `type[i]===RJ.Particle` +
+//     `linkedElementIndex[i]` pair used throughout simulation-worker.js
+//     for rendering/color and physics, always to recover the real element
+//     a particle will revert to on landing), so checking a real element's
+//     mask against a bare "Particle" value would always fail. Copying that
+//     same skip into this mod's own filter check, without also resolving
+//     what the particle actually *is*, meant the filter check plainly
+//     never ran at all for anything that arrived already flying - and
+//     vanilla's own code, further down this same function, has no cadence
+//     gate for that case either (a particle landing exactly on a
+//     registered launcher type skips the normal fire-rate check and
+//     relaunches immediately, by design - that's what makes chained
+//     launcher towers work smoothly). Combined, an incoming particle hit
+//     this mod's own blocks with no filter check and no cadence gate at
+//     all, explaining exactly what was reported.
+//
+//     Fix: instead of skipping the filter check for particles, it now
+//     resolves the particle's real underlying type first (`type[t]` when
+//     not a particle, or `type[linkedElementIndex[t]]` when it is, the
+//     same lookup the game's own rendering code already relies on) and
+//     checks *that* against the filter mask - for both this mod's own
+//     filter-match check and the separate liquid/gas-restricted-to-
+//     Advanced guard right after it, since both had the identical gap.
+//     Material dropped in by hand and material arriving already in flight
+//     now go through the exact same filter decision.
+//
+// 16. Investigated, NOT a bug: a player set a wide (1x15) row of Filtered
+//     Launchers to launch only Sand, then poured a mix of Sand and Residue
+//     over it. Residue is less dense and floats to the top; Sand sinks and
+//     settles into the launcher row underneath it - expected so far. But
+//     once settled, the Sand stopped being launched at all, with a solid
+//     layer of Residue sitting directly above every launcher cell.
+//
+//     Traced the actual launch call (module 96245's `J`, invoked at the
+//     end of the launcher-tick function this mod already patches): firing
+//     doesn't teleport material into the cell above - it turns whatever's
+//     already sitting in the launcher's own cell into a flying particle
+//     with velocity, and that particle then has to *move* upward one cell
+//     at a time on later ticks, through the same collision rules as any
+//     other physical object. If the cell directly above is already solidly
+//     occupied, it can't advance - and because less-dense Residue
+//     continuously re-floats into that exact spot as fast as any gap
+//     opens, the Sand ends up permanently jammed against a self-refilling
+//     wall of the very material it's not supposed to launch.
+//
+//     This has nothing to do with this mod's filter logic - the same
+//     "turn into a particle, then physically move up" launch mechanism is
+//     shared with the plain vanilla Launcher (point 1), and confirmed by
+//     testing: a vanilla Launcher with no filter at all, placed under the
+//     identical density-sorted Sand/Residue mix, gets stuck the exact same
+//     way. It's a general consequence of density-based sorting plus "you
+//     can't launch into an already-occupied cell," not something this
+//     mod's patches touch or could fix without changing how vanilla
+//     launching itself works. No patch added; documenting the confirmed
+//     cause so it isn't mistaken for point 12/14's pass-through/filter
+//     logic misbehaving.
+//
 // HONESTY NOTE: everything above was verified by reading the game's own
 // code and, for points 3-6, by actually testing earlier versions in-game
 // and tracing the real cause of each reported bug. structures.register /
@@ -593,19 +663,23 @@
 // vanilla Launcher/Launcher Mk2 AND the plain Filtered Launcher really
 // still refuse them exactly as before), the point-10 one (does this mod's
 // filter screen now work correctly alongside Solaryum enabled, without
-// needing it disabled), and the point-12/14 ones together (does
-// non-matching material really pass through cleanly on both a gravity-fed
-// column and a belt line, does matching material still get launched
-// reliably enough in practice, AND does a vanilla Filter Wall/Filter Wall
-// Mk2/Critter Fence set to Block still correctly block belt-fed material
-// with this mod installed) - none of that is something static analysis
-// alone can fully settle. This pass-through mechanism has already gone
-// through a real-play-driven redesign and reversion (point 12/13), a
-// removal that fixed a vanilla regression but broke this mod's own belt
-// behavior in the process (point 13), and a type-scoped rewrite meant to
-// finally get both right at once (point 14) - so it remains, by a wide
-// margin, the part of this mod most worth testing thoroughly rather than
-// trusting on the strength of the reasoning alone.
+// needing it disabled), the point-12/14 ones together (does non-matching
+// material really pass through cleanly on both a gravity-fed column and a
+// belt line, does matching material still get launched reliably enough in
+// practice, AND does a vanilla Filter Wall/Filter Wall Mk2/Critter Fence
+// set to Block still correctly block belt-fed material with this mod
+// installed), and the point-15 one (does material thrown at this mod's
+// blocks by a normal vanilla Launcher get the exact same filter decision
+// as material placed by hand, in both directions - allowed *and* blocked)
+// - none of that is something static analysis alone can fully settle. This
+// pass-through mechanism has already gone through a real-play-driven
+// redesign and reversion (point 12/13), a removal that fixed a vanilla
+// regression but broke this mod's own belt behavior in the process (point
+// 13), a type-scoped rewrite meant to finally get both right at once
+// (point 14), and a fix for a filter check that silently never ran at all
+// against anything arriving already in flight (point 15) - so it remains,
+// by a wide margin, the part of this mod most worth testing thoroughly
+// rather than trusting on the strength of the reasoning alone.
 
 const api = sandkit.api;
 

@@ -742,17 +742,95 @@ ter sido o item #12 desde o início; a remoção total do item anterior
 fica registrada acima como o passo intermediário (que passou do ponto),
 não como o design final.
 
+### 14. Relato real de usuário: item lançado por um Launcher normal chega no nosso bloco e é relançado sem checar o filtro
+
+Um jogador reportou: **jogar** um material em cima de um bloco deste
+mod respeita o filtro certinho (o que não bate não é lançado); mas se
+um **Launcher vanilla normal** lança esse mesmo material bem em cima
+do nosso bloco, ele é relançado na hora, **ignorando o filtro
+completamente**. Ou seja, o bug era específico de material chegando
+**já voando**.
+
+**Causa raiz:** o patch do item #10/12 que checa o filtro na hora de
+lançar (`gate-launch-on-tile-filter-match...`) tinha a condição
+`if(T&&y!==r.RJ.Particle){...checagem...}` — copiando um padrão que o
+próprio código vanilla usa uma linha depois, só que por um motivo
+diferente do nosso. Enquanto um item está **voando** (acabou de ser
+lançado por qualquer launcher), o jogo troca o `type` dele pro valor
+genérico `Particle` e guarda o material de verdade num índice separado
+(`linkedElementIndex`) — só recupera a identidade real ao pousar
+(confirmei esse mesmo par `type===Particle` + `linkedElementIndex`
+sendo usado em vários outros lugares do próprio `simulation-worker.js`,
+sempre pra descobrir "no que essa partícula vai virar quando pousar").
+Comparar um `Particle` genérico contra a lista do filtro nunca ia
+bater com nada de verdade — então a condição pulava a checagem inteira
+nesse caso, achando que estava sendo cautelosa.
+
+O problema: o código vanilla, logo depois, **também não tem nenhuma
+trava de cadência** pra esse mesmo caso — uma partícula que pousa
+exatamente em cima de qualquer launcher registrado é relançada **na
+hora**, sem esperar o próprio ritmo de disparo do launcher (é assim
+que "torres" de launchers empilhados conseguem lançar em cadeia sem
+engasgar). Juntando os dois: um item chegando voando batia no nosso
+bloco sem checagem de filtro **e** sem checagem de cadência nenhuma —
+exatamente o relatado.
+
+**Correção:** em vez de pular a checagem quando o item é uma
+`Particle`, agora ela resolve o tipo **de verdade** primeiro
+(`type[t]` quando não é partícula, ou `type[linkedElementIndex[t]]`
+quando é — a mesma consulta que o próprio código de renderização do
+jogo já faz) e compara **esse** valor com o filtro. Apliquei a mesma
+correção nas duas checagens que tinham o mesmo problema: a do filtro
+em si e a que restringe líquido/gás só ao Advanced. Material colocado
+à mão e material chegando voando agora passam pela exata mesma decisão
+de filtro.
+
+### 15. Investigado, NÃO é bug: Sand afunda, Residue flutua, e a Sand fica presa embaixo do Residue
+
+Terceiro relato do mesmo comentário: uma fileira larga (1x15) de
+Filtered Launchers configurada pra lançar só Sand, cheia de uma mistura
+de Sand + Residue. Residue é menos denso e flutua pra cima; Sand afunda
+e se instala embaixo, exatamente onde estão os launchers — até aqui,
+esperado. Só que, depois de assentar, a Sand parou de ser lançada de
+vez, com uma camada sólida de Residue bem em cima de cada launcher.
+
+**Investigação:** rastreei a chamada real de lançamento (`J` do módulo
+`96245`, no fim da mesma função de "deve lançar" que este mod já
+mexe): disparar não teleporta o material pra célula de cima — ele
+transforma o que já está sentado na própria célula do launcher numa
+partícula com velocidade, e essa partícula precisa **se mover** célula
+por célula pra cima nos ticks seguintes, pelas mesmas regras de colisão
+de qualquer outro objeto físico. Se a célula de cima já está
+solidamente ocupada, ela não avança — e como o Residue (menos denso)
+fica se reacomodando ali por cima assim que qualquer espaço abre, a
+Sand fica permanentemente travada contra uma parede que se
+"regenera" sozinha, feita exatamente do material que ela não devia
+lançar.
+
+Isso não tem nada a ver com a lógica de filtro deste mod — o mesmo
+mecanismo de "virar partícula e se mover pra cima" é compartilhado com
+o Launcher vanilla comum (item #1), e confirmei por teste direto: um
+**Launcher vanilla sem filtro nenhum**, na mesma mistura Sand/Residue
+já densamente separada, trava exatamente do mesmo jeito. É uma
+consequência geral de separação por densidade + "não dá pra lançar pra
+dentro de uma célula já ocupada", não algo que os patches deste mod
+tocam ou têm como corrigir sem mexer em como o lançamento vanilla
+funciona no jogo inteiro. Nenhum patch novo — só documentando a causa
+confirmada pra não ser confundida com a lógica de pass-through/filtro
+dos itens #12/#14.
+
 ## Ponto de honestidade
 
 Tudo acima foi confirmado lendo o próprio código do jogo e, pros itens
-3, 4, 5, 6, 7, 8, 9, 10, 11, 12 e 13 da lista de bugs, testando de fato
-versões anteriores no jogo e rastreando a causa real de cada relato.
-`structures.register` / `structureBehaviors.registerLauncherType` /
-`structures.getAtCell` / `structures.update` / `tech.addDefinition` são
-chamadas públicas reais e atuais do Sandkit. Os **doze** patches em
+3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14 e 15 da lista de bugs, testando
+de fato versões anteriores no jogo (ou, no caso do item #15, um
+controle direto contra o Launcher vanilla) e rastreando a causa real de
+cada relato. `structures.register` / `structureBehaviors.registerLauncherType`
+/ `structures.getAtCell` / `structures.update` / `tech.addDefinition`
+são chamadas públicas reais e atuais do Sandkit. Os **doze** patches em
 `patches.json` (quatro do item #3/#5, dois do item #6, um do item #4,
 quatro do item #7 — um deles reescrito pelo item #9 pra ficar
-resistente a ordem —, um do item #10 para a checagem de filtro no
+resistente a ordem —, um do item #10/#14 para a checagem de filtro no
 launcher, e mais um do item #13 para a autorização de movimento
 restrita aos blocos deste mod) mexem em território não documentado, do
 mesmo jeito que `grabber-safe-resize`/`toggle-grab` deste pacote já
@@ -762,41 +840,48 @@ experiência real e foi revertida; o item #12 registra um segundo patch
 (o de autorização de movimento do item #10) que precisou ser removido
 de vez depois de um relato real mostrar que ele quebrava o modo Block
 de três estruturas vanilla (`filterWall`, `filterWallMk2`,
-`critterFence`) que já usavam o mesmo campo por conta própria; e o
-item #13 mostra que essa remoção foi longe demais — quebrou a esteira
-dos próprios blocos deste mod de novo — e reintroduz o mesmo patch de
+`critterFence`) que já usavam o mesmo campo por conta própria; o item
+#13 mostra que essa remoção foi longe demais — quebrou a esteira dos
+próprios blocos deste mod de novo — e reintroduz o mesmo patch de
 autorização de movimento, agora restrito por tipo de estrutura via
-`getTypeFromIndex`, resolvendo os dois relatos ao mesmo tempo sem
-tocar em conteúdo vanilla. O histórico de todas as versões fica
-registrado acima porque é assim que a decisão de verdade foi tomada,
-mesmo tendo passado por um patch a mais, depois a menos, depois de
-volta. Cada patch é validado com o `validate-mod.js` deste repositório
-(que roda o aplicador de patch de verdade do próprio jogo contra os
-arquivos instalados de verdade, e confere que o resultado remendado
-ainda é JavaScript sintaticamente válido), mas só jogar de fato
-confirma o comportamento em tempo de execução ponta a ponta —
-principalmente os do item #3/#5 ("a tela nativa, as caixinhas
-clicáveis, a escolha de elemento e o modo avançado tratam este mod
-igual a um Filter/Advanced Filter vanilla"), os do item #6 ("a tech
-nova aparece, trava/libera certo, e realmente desbloqueia o bloco ao
-pesquisar"), os do item #7 ("líquido/gás realmente sai voando só do
-Advanced Filtered Launcher, e o Launcher/Launcher Mk2 vanilla e o
-Filtered Launcher comum continuam recusando exatamente como antes"), o
-do item #8 ("arrastar um retângulo realmente planta um bloco inteiro
-de launchers, com Up em cima e Left/Right alimentando, ou uma parede
-inteira de lado"), o do item #9 (a tela de filtro funciona mesmo com
-Solaryum ativado), e os do item #10/#12/#13 juntos ("material que não
-bate no filtro passa pelo tile livremente por gravidade **e** por
-esteira nos blocos deste mod, o que bate ainda é lançado corretamente
-na maior parte do tempo com a limitação de timing conhecida do item
-#11 em esteiras muito rápidas, **e** um Filter Wall/Filter Wall
-Mk2/Critter Fence vanilla configurado pra Block continua bloqueando
-material vindo por esteira, com este mod instalado e ativo") — nenhum
-desses é algo que dá pra confirmar 100% só lendo código, e esse
-mecanismo de pass-through em particular já passou por uma rodada de
-redesenho e reversão via teste real, uma remoção que corrigiu o
-vanilla mas quebrou o comportamento esperado deste mod, e uma reescrita
-restrita por tipo pra resolver as duas coisas de vez, então continua
+`getTypeFromIndex`; e o item #14 corrige um buraco diferente no mesmo
+patch de checagem de filtro do launcher, que pulava a checagem inteira
+pra material chegando **já voando** (lançado por outro launcher). O
+histórico de todas as versões fica registrado acima porque é assim que
+a decisão de verdade foi tomada, mesmo tendo passado por um patch a
+mais, depois a menos, depois de volta. Cada patch é validado com o
+`validate-mod.js` deste repositório (que roda o aplicador de patch de
+verdade do próprio jogo contra os arquivos instalados de verdade, e
+confere que o resultado remendado ainda é JavaScript sintaticamente
+válido), mas só jogar de fato confirma o comportamento em tempo de
+execução ponta a ponta — principalmente os do item #3/#5 ("a tela
+nativa, as caixinhas clicáveis, a escolha de elemento e o modo
+avançado tratam este mod igual a um Filter/Advanced Filter vanilla"),
+os do item #6 ("a tech nova aparece, trava/libera certo, e realmente
+desbloqueia o bloco ao pesquisar"), os do item #7 ("líquido/gás
+realmente sai voando só do Advanced Filtered Launcher, e o
+Launcher/Launcher Mk2 vanilla e o Filtered Launcher comum continuam
+recusando exatamente como antes"), o do item #8 ("arrastar um
+retângulo realmente planta um bloco inteiro de launchers, com Up em
+cima e Left/Right alimentando, ou uma parede inteira de lado"), o do
+item #9 (a tela de filtro funciona mesmo com Solaryum ativado), os do
+item #10/#12/#13 juntos ("material que não bate no filtro passa pelo
+tile livremente por gravidade **e** por esteira nos blocos deste mod,
+o que bate ainda é lançado corretamente na maior parte do tempo com a
+limitação de timing conhecida do item #11 em esteiras muito rápidas,
+**e** um Filter Wall/Filter Wall Mk2/Critter Fence vanilla configurado
+pra Block continua bloqueando material vindo por esteira, com este mod
+instalado e ativo"), e o do item #14 ("material lançado por um
+Launcher vanilla normal em cima de um bloco deste mod recebe a mesma
+checagem de filtro que material colocado à mão, nos dois sentidos —
+tanto o que devia ser lançado quanto o que devia ficar parado") —
+nenhum desses é algo que dá pra confirmar 100% só lendo código, e esse
+mecanismo de pass-through/checagem de filtro em particular já passou
+por uma rodada de redesenho e reversão via teste real, uma remoção que
+corrigiu o vanilla mas quebrou o comportamento esperado deste mod, uma
+reescrita restrita por tipo pra resolver as duas coisas de vez, e uma
+correção separada pra um buraco na própria checagem de filtro que
+nunca tinha sido testado com material chegando voando — então continua
 sendo, de longe, a parte deste mod que mais merece atenção antes de
 confiar cegamente.
 
@@ -894,6 +979,13 @@ confiar cegamente.
     voltou (o patch do item #13 deixou de restringir corretamente por
     tipo de estrutura). Repete o mesmo teste com um **Critter Fence**
     vanilla, se tiver acesso a ele.
+17. **Regressão do item #14:** posiciona um **Launcher vanilla normal**
+    apontado direto pra um bloco deste mod. Configura o filtro do bloco
+    pra **não aceitar** um material X. Carrega o Launcher vanilla com
+    X e dispara em cima do bloco deste mod — confirma que ele **não** é
+    relançado (deve só cair/ficar ali, igual aconteceria se você tivesse
+    colocado X à mão). Repete com um material que o filtro **aceita** —
+    esse sim deve ser relançado normalmente, mesmo chegando voando.
 
 Se os passos 1-2 não aparecerem certos, os patches do item #6 precisam
 de outro olhar; se os passos 3-5 falharem, é o item #3/#5 (e, se só
@@ -919,7 +1011,11 @@ chegar por esteira, é o mesmo patch que precisa de outro olhar; o passo
 patch quebrado; se o passo 16 mostrar o Filter Wall/Filter Wall
 Mk2/Critter Fence vanilla deixando material bloqueado passar, o patch
 de autorização de movimento do item #13 não está restringindo pelo
-tipo de estrutura corretamente e precisa de outro olhar.
+tipo de estrutura corretamente e precisa de outro olhar; se o passo 17
+mostrar o material bloqueado sendo relançado mesmo chegando por um
+Launcher vanilla, a resolução de tipo real (`Particle` →
+`linkedElementIndex`) do item #14 não está funcionando e precisa de
+outro olhar.
 
 ## Publicar no Steam Workshop
 
