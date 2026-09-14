@@ -1,0 +1,26 @@
+[
+	{
+		"id": "add-held-quantity-to-grabber-size-overlay",
+		"file": "js/bundle.js",
+		"find": "Id.createElement(\"span\",{className:\"min-w-[3rem] text-center\"},U)",
+		"operation": "replace",
+		"code": "Id.createElement(\"span\",{className:\"min-w-[3rem] text-center\"},U),(s?Id.createElement(\"span\",{className:\"text-[#ffe700] font-bold\",style:{marginLeft:\"0.25rem\"}},`${i.data.matrix[1]}/${o}`):null)",
+		"expectedMatches": 1
+	},
+	{
+		"id": "refresh-grabber-overlay-on-pickup",
+		"file": "js/bundle.js",
+		"find": "elementType:U})}return}",
+		"operation": "replace",
+		"code": "elementType:U})}r.FH.ui.overlays.update(e,\"hotbar\");return}",
+		"expectedMatches": 1
+	},
+	{
+		"id": "refresh-grabber-overlay-on-drop",
+		"file": "js/bundle.js",
+		"find": "L(M)}M[1]>0&&(T=performance.now())",
+		"operation": "replace",
+		"code": "L(M)}r.FH.ui.overlays.update(e,\"hotbar\");M[1]>0&&(T=performance.now())",
+		"expectedMatches": 1
+	}
+]
